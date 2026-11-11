@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { addMonths, bigFits, contentsFit, diffMonths, indexMonth, monthIndex, resizedBig, smallFits, backlogSlot, isMonth, releaseFits, formatMonth } from '@roadmap/shared';
+import { addMonths, bigFits, contentsFit, pushDown, diffMonths, indexMonth, monthIndex, resizedBig, smallFits, backlogSlot, isMonth, releaseFits, formatMonth } from '@roadmap/shared';
 import { pointInGrid, containsPoint, blockRect, trackAt, blockLabel, ROW_HEIGHT, GRID_HEADER } from '../lib/geometry.js';
 
 export default function useGridDrag({ doc, act, gridRef, colWidthRef }) {
@@ -86,9 +86,14 @@ export default function useGridDrag({ doc, act, gridRef, colWidthRef }) {
             const delta = state.mode === 'bottom' ? Math.round((point.y - state.startGridY) / ROW_HEIGHT) : Math.round((worldQuarter - state.startWorld) / 4);
             block = resizedBig(state.parent, state.mode, delta);
           }
-          const valid = bigFits(doc.bigBlocks, block) && contentsFit(block);
-          candidate = { ...candidate, block, target: 'grid', valid, label: valid ? blockLabel(block) : 'Blocked: overlap, bounds, or existing items',
-            action: { type: 'updateBig', id: state.id, patch: block } };
+          // Growing from the bottom pushes the blocks below down instead of colliding.
+          const push = state.mode === 'bottom' && block.rows > state.parent.rows ? pushDown(doc.bigBlocks, block) : null;
+          const blocks = push ? push.blocks : doc.bigBlocks;
+          const pushed = push ? push.blocks.filter((b) => push.moved.includes(b.id)) : [];
+          const valid = contentsFit(block) && bigFits(blocks, block) && pushed.every((b) => bigFits(blocks, b));
+          const pushNote = pushed.length ? ` · pushes ${pushed.length} ${pushed.length === 1 ? 'block' : 'blocks'} down` : '';
+          candidate = { ...candidate, block, pushed, target: 'grid', valid, label: valid ? blockLabel(block) + pushNote : 'Blocked: overlap, bounds, or existing items',
+            action: { type: 'updateBig', id: state.id, patch: block, pushDown: Boolean(push) } };
         } else {
           const target = state.mode === 'move'
             ? doc.bigBlocks.find((b) => b.placement && containsPoint(blockRect(b, width, start), point.x, point.y))

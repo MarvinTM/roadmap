@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { addMonths, diffMonths, monthIndex, indexMonth, emptyRoadmap, validateRoadmap, bigFits, smallFits, firstSlot, backlogSlot, resizedBig, releaseFits, nextReleaseMonth, releasePeriods } from './domain.js';
+import { addMonths, diffMonths, monthIndex, indexMonth, emptyRoadmap, validateRoadmap, bigFits, smallFits, firstSlot, backlogSlot, resizedBig, pushDown, releaseFits, nextReleaseMonth, releasePeriods } from './domain.js';
 
 const item = (patch = {}) => ({ id: 's1', title: 'Story', jiraUrl: null, track: 0, offset: 0, length: 4, ...patch });
 const block = (patch = {}) => ({
@@ -44,6 +44,51 @@ describe('rectangle and item collisions', () => {
     expect(validateRoadmap(doc(resizedBig(original, 'left', 2)))).not.toBe(null);
     expect(validateRoadmap(doc(resizedBig(original, 'right', -2)))).not.toBe(null);
     expect(validateRoadmap(doc(resizedBig(original, 'bottom', -1)))).not.toBe(null);
+  });
+});
+
+describe('pushing blocks down when a block grows downwards', () => {
+  // `at(id, start, row, months, rows)` builds a 1-item-free scheduled block.
+  const at = (id, start, row, months = 1, rows = 1) => block({ id, months, rows, placement: { start, row } });
+  const rowsOf = (blocks) => Object.fromEntries(blocks.map((b) => [b.id, b.placement.row]));
+
+  it('pushes a colliding block just below the grown block, and cascades to the blocks it then hits', () => {
+    const a = at('a', '2026-11', 0, 3, 2);
+    const b = at('b', '2026-12', 2);
+    const c = at('c', '2026-12', 3);
+    const result = pushDown([a, b, c], resizedBig(a, 'bottom', 2));
+    expect(rowsOf(result.blocks)).toEqual({ a: 0, b: 4, c: 5 });
+    expect(result.moved.sort()).toEqual(['b', 'c']);
+    expect(validateRoadmap(doc(...result.blocks))).toBe(null);
+  });
+
+  it('leaves blocks in other months, touching blocks and blocks above untouched', () => {
+    const above = at('above', '2026-11', 0);
+    const a = at('a', '2026-11', 1, 2, 1);
+    const elsewhere = at('elsewhere', '2027-03', 2);
+    const touching = at('touching', '2026-12', 3);
+    const result = pushDown([above, a, elsewhere, touching], resizedBig(a, 'bottom', 1));
+    expect(result.moved).toEqual([]);
+    expect(rowsOf(result.blocks)).toEqual({ above: 0, a: 1, elsewhere: 2, touching: 3 });
+  });
+
+  it('pushes a block that was below a pushed block even if it now starts above its new top', () => {
+    const p = at('p', '2026-11', 0, 2, 2);         // Nov-Dec
+    const x = at('x', '2026-12', 2, 2, 1);         // Dec-Jan, under p
+    const y = at('y', '2027-01', 3, 1, 4);         // Jan only: under x, not under p
+    const result = pushDown([p, x, y], resizedBig(p, 'bottom', 4));
+    expect(rowsOf(result.blocks)).toEqual({ p: 0, x: 6, y: 7 });
+    expect(validateRoadmap(doc(...result.blocks))).toBe(null);
+  });
+
+  it('settles a block pushed by two blocks below the lower of them', () => {
+    const a = at('a', '2026-11', 0, 2, 1);
+    const left = at('left', '2026-11', 1, 1, 1);
+    const right = at('right', '2026-12', 1, 1, 3);
+    const below = at('below', '2026-11', 3, 2, 1);
+    const result = pushDown([a, left, right, below], resizedBig(a, 'bottom', 1));
+    expect(rowsOf(result.blocks)).toEqual({ a: 0, left: 2, right: 2, below: 5 });
+    expect(validateRoadmap(doc(...result.blocks))).toBe(null);
   });
 });
 

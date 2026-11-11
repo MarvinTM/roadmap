@@ -32,11 +32,12 @@ export default function EditDialog({ selection, onClose }) {
       };
     } else {
       // Start changes in this dialog move the whole block; edge drags alone anchor items.
-      action = {
-        type: 'updateBig', id: parent.id,
-        patch: { title: form.title.trim(), color: form.color, months: Number(form.months), rows: Number(form.rows),
-          placement: form.scheduled ? { start: form.start, row: Number(form.row) - 1 } : null },
-      };
+      const patch = { title: form.title.trim(), color: form.color, months: Number(form.months), rows: Number(form.rows),
+        placement: form.scheduled ? { start: form.start, row: Number(form.row) - 1 } : null };
+      // Only adding rows in place pushes the blocks below; other changes still reject overlaps.
+      const onlyGrowsDown = parent.placement && patch.placement && patch.rows > parent.rows && patch.months === parent.months &&
+        patch.placement.start === parent.placement.start && patch.placement.row === parent.placement.row;
+      action = { type: 'updateBig', id: parent.id, patch, pushDown: Boolean(onlyGrowsDown) };
     }
     try { changeDocument(doc, action); act(action); onClose(); }
     catch (error) { setError(error.message); }
@@ -72,7 +73,7 @@ export default function EditDialog({ selection, onClose }) {
               <TextField fullWidth type="month" label="Start month" value={form.start} onChange={change('start')} required slotProps={{ inputLabel: { shrink: true } }} />
               {numberField('row', 'Top row')}
             </Stack>}
-            <Typography variant="caption" color="text.secondary">Rows count from 1. Items must fit and blocks cannot overlap. Changing the start month moves all items with the block.</Typography>
+            <Typography variant="caption" color="text.secondary">Rows count from 1. Items must fit and blocks cannot overlap, except that adding rows pushes the blocks below down. Changing the start month moves all items with the block.</Typography>
             {parent.placement && <Typography variant="caption" color="text.secondary">To resize from the left without moving items, use the left-edge controls in the block menu.</Typography>}
           </>}
         </Stack>

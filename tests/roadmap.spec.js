@@ -330,6 +330,27 @@ test('resizes all big-block edges and keeps items anchored when resizing from th
   expect((await persisted(request)).bigBlocks[0]).toMatchObject({ months: 3, rows: 3, smallBlocks: [{ offset: 0 }] });
 });
 
+test('growing a big block from the bottom pushes the blocks below down instead of being blocked', async ({ page, request }) => {
+  await seed(request, [
+    big(),
+    big({ id: 'b2', title: 'Hiring', months: 1, rows: 1, placement: { start: '2026-12', row: 2 } }),
+    big({ id: 'b3', title: 'Marketing', months: 1, rows: 1, placement: { start: '2026-12', row: 3 } }),
+    big({ id: 'b4', title: 'Elsewhere', months: 1, rows: 1, placement: { start: '2027-03', row: 2 } }),
+  ]);
+  await page.goto('/');
+  const bottom = await center(page.getByRole('separator', { name: 'Resize Platform v2 from bottom' }));
+  await page.mouse.move(bottom.x, bottom.y);
+  await page.mouse.down();
+  await page.mouse.move(bottom.x, bottom.y + 64, { steps: 12 });
+  await expect(page.locator('.drag-ghost.valid:not(.pushed)')).toBeVisible();
+  await expect(page.locator('[data-pushed-ghost]')).toHaveCount(2);
+  await expect(page.locator('.drag-label')).toContainText('pushes 2 blocks down');
+  await page.mouse.up();
+  await saved(page);
+  const rows = Object.fromEntries((await persisted(request)).bigBlocks.map((b) => [b.id, [b.rows, b.placement.row]]));
+  expect(rows).toEqual({ b1: [3, 0], b2: [1, 3], b3: [1, 4], b4: [1, 2] });
+});
+
 test('creates at a clicked quarter, resizes an item, and moves it to another track', async ({ page, request }) => {
   await seed(request, [big()]);
   await page.goto('/');

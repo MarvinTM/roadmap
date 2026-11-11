@@ -1,4 +1,4 @@
-import { backlogSlot, firstSlot, validateRoadmap, COLORS, bigFits, smallFits, nextReleaseMonth, sortedReleases, revealRelease, releaseFits } from '@roadmap/shared';
+import { backlogSlot, firstSlot, validateRoadmap, COLORS, bigFits, smallFits, pushDown, nextReleaseMonth, sortedReleases, revealRelease, releaseFits } from '@roadmap/shared';
 
 const nextOrder = (doc) => Math.max(-1, ...doc.bigBlocks.map((b) => b.backlogOrder ?? -1)) + 1;
 const findBig = (doc, id) => {
@@ -50,7 +50,8 @@ export function changeDocument(doc, action) {
       const old = findBig(doc, action.id);
       const block = { ...old, ...action.patch };
       block.backlogOrder = block.placement ? null : old.backlogOrder ?? nextOrder(doc);
-      next = replaceBig(doc, block);
+      // Growing downwards may push the blocks below out of the way instead of being rejected.
+      next = action.pushDown && block.placement ? { ...doc, bigBlocks: pushDown(doc.bigBlocks, block).blocks } : replaceBig(doc, block);
       break;
     }
     case 'deleteBig': {

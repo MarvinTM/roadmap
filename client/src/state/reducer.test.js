@@ -10,6 +10,16 @@ function setup(scheduled = false) {
 }
 
 describe('roadmap actions', () => {
+  it('pushes blocks below down when growing downwards, but only when asked to', () => {
+    let doc = apply(setup(true), { type: 'addBig', id: 'b' });
+    doc = apply(doc, { type: 'updateBig', id: 'b', patch: { placement: { start: '2026-11', row: 1 } } });
+    const grow = { type: 'updateBig', id: 'a', patch: { rows: 3 } };
+    expect(() => changeDocument(doc, grow)).toThrow('Big blocks overlap');
+    const pushed = apply(doc, { ...grow, pushDown: true });
+    expect(pushed.bigBlocks.find((b) => b.id === 'a')).toMatchObject({ rows: 3, placement: { row: 0 } });
+    expect(pushed.bigBlocks.find((b) => b.id === 'b').placement).toEqual({ start: '2026-11', row: 3 });
+  });
+
   it('preserves shape and contents through unscheduling and rescheduling', () => {
     let doc = setup(true);
     doc = apply(doc, { type: 'updateBig', id: 'a', patch: { months: 3, rows: 2 } });

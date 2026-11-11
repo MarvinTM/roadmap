@@ -53,6 +53,37 @@ export function bigFits(blocks, candidate) {
     intervalsOverlap(row, candidate.rows, other.placement.row, other.rows));
 }
 
+/**
+ * Places `block` (already grown downwards) and pushes every scheduled block it
+ * now overlaps down just far enough to clear it, cascading to any block those
+ * then overlap. Only blocks that started below their pusher are pushed, so
+ * blocks out of the way or above never move (an overlap with one of those is
+ * left for validation to reject). Returns the new block list and the ids of
+ * the blocks that moved.
+ */
+export function pushDown(blocks, block) {
+  const originalRow = new Map(blocks.filter((b) => b.placement).map((b) => [b.id, b.placement.row]));
+  originalRow.set(block.id, block.placement.row);
+  const next = new Map(blocks.map((b) => [b.id, b.id === block.id ? block : b]));
+  const moved = new Set();
+  const queue = [block.id];
+  while (queue.length) {
+    const pusher = next.get(queue.shift()); // latest position; a block can be queued more than once
+    const bottom = pusher.placement.row + pusher.rows;
+    for (const other of next.values()) {
+      if (other.id === pusher.id || other.id === block.id || !other.placement ||
+          originalRow.get(other.id) <= originalRow.get(pusher.id)) continue;
+      if (!intervalsOverlap(monthIndex(pusher.placement.start), pusher.months, monthIndex(other.placement.start), other.months) ||
+          !intervalsOverlap(pusher.placement.row, pusher.rows, other.placement.row, other.rows)) continue;
+      const pushed = { ...other, placement: { ...other.placement, row: bottom } };
+      next.set(other.id, pushed);
+      moved.add(other.id);
+      queue.push(other.id);
+    }
+  }
+  return { blocks: blocks.map((b) => next.get(b.id)), moved: [...moved] };
+}
+
 export function smallFits(parent, item, excludeId = item.id) {
   return integer(item.track) && item.track < parent.rows && integer(item.offset) &&
     integer(item.length, 1) && item.offset + item.length <= parent.months * 4 &&

@@ -88,13 +88,14 @@ A lightweight, single-user web app for managing a personal roadmap. You create *
 | Schedule | Drag a backlog card onto the grid | It is placed with its stored shape, with its top-left cell at the hovered (month, row). |
 | Move | Drag the block's header | It moves across months and/or rows. Its shape and contents are preserved. |
 | Stretch horizontally | Drag the left or right edge | Changes the start or end month, snapping to whole months. The minimum is 1 month. |
-| Stretch vertically | Drag the bottom edge | Changes the number of rows (and therefore tracks). The minimum is 1 row. |
+| Stretch vertically | Drag the bottom edge | Changes the number of rows (and therefore tracks). The minimum is 1 row. Growing into blocks below pushes them down (see the rules below). |
 | Unschedule | Drag it to the backlog, or use menu → Unschedule | It goes to the backlog and keeps its shape and small blocks. |
 | Delete | Drag it to the trash, or use menu → Delete | It is removed, with an **Undo** snackbar for about 5 s. |
 | Rename / color | Double-click the title / `⋮` menu | Inline edit. A palette of about 8 colors. |
 
 **Rules**
 - **No shared cells**: a move, resize or schedule is valid only if every cell of the new rectangle is free (the block's own cells don't count). Blocks may touch edge to edge.
+- **Growing down pushes**: the one exception is adding rows to a scheduled block in place (bottom-edge drag, or only raising *Rows* in the edit dialog). Each block it would overlap moves down just far enough to clear it, cascading to the blocks those then hit; blocks that are not in the way stay put. The preview shows dotted outlines where pushed blocks will land.
 - **Contents constrain shrinking**: a big block cannot be shrunk (from the left, the right or the bottom) past the extent of its small blocks. Resizing from the left keeps small blocks at their absolute months by shifting their offsets.
 - **Feedback**: during the gesture, a ghost rectangle shows the snapped target. It is blue when the drop is valid and red when it isn't. An invalid drop snaps back. A tooltip shows e.g. "Jan 2027 – Apr 2027 · 2 rows".
 - The grab offset is preserved, so the block doesn't jump to the pointer.

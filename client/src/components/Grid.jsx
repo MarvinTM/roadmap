@@ -34,7 +34,9 @@ export default function Grid({ doc, gridRef, colWidthRef, ui, begin, preview, ex
     else if (end > grid.scrollLeft + grid.clientWidth) grid.scrollLeft = end - grid.clientWidth;
   }, [doc.releases, startMonth, monthsVisible, colWidth, gridRef]);
   const scheduled = doc.bigBlocks.filter((b) => b.placement);
-  const rows = Math.max(1, ...scheduled.map((b) => b.placement.row + b.rows + 1), extraRows);
+  // Grow the canvas so blocks a bottom resize would push down stay visible.
+  const previewed = preview?.pushed || [];
+  const rows = Math.max(1, ...scheduled.map((b) => b.placement.row + b.rows + 1), ...previewed.map((b) => b.placement.row + b.rows + 1), extraRows);
   const visible = scheduled.filter((b) => diffMonths(b.placement.start, startMonth) < monthsVisible && diffMonths(b.placement.start, startMonth) + b.months > 0);
   let ghost = null;
   if (preview?.block?.placement && preview.target === 'grid') {
@@ -48,6 +50,9 @@ export default function Grid({ doc, gridRef, colWidthRef, ui, begin, preview, ex
     }
     ghost = <div className={`drag-ghost ${preview.valid ? 'valid' : 'invalid'}`} style={rect} />;
   }
+  // Where blocks pushed down by a bottom resize will land.
+  const pushedGhosts = preview?.valid && preview.target === 'grid' ? (preview.pushed || []).map((block) =>
+    <div key={block.id} className="drag-ghost pushed" data-pushed-ghost={block.id} style={blockRect(block, colWidth, startMonth)} />) : null;
   return (
     <main ref={gridRef} className={`grid-scroll ${preview?.kind === 'small' ? 'is-small-drag' : ''}`} aria-label="Roadmap grid" tabIndex={0}>
       <div className="grid-content" style={{ width: colWidth * monthsVisible, minHeight: '100%' }}>
@@ -79,6 +84,7 @@ export default function Grid({ doc, gridRef, colWidthRef, ui, begin, preview, ex
           {preview?.release && isMonth(preview.release.month) && preview.target === 'grid' &&
             <div data-release-preview className={`release-boundary release-preview ${preview.valid ? 'valid' : 'invalid'}`}
               style={{ left: (diffMonths(preview.release.month, startMonth) + 1) * colWidth - 1 }} />}
+          {pushedGhosts}
           {ghost}
           {!doc.bigBlocks.length && <div className="grid-empty"><h2>Your roadmap, one block at a time.</h2><p>Create a big block in the backlog, then drag it here.<br />Double-click a track to add a story.</p></div>}
         </div>
