@@ -3,7 +3,12 @@
 /** @typedef {{id:string,title:string,month:string,color:string}} Release */
 /** @typedef {{schemaVersion:2,revision:number,updatedAt:string,settings:{startMonth:string,monthsVisible:number,tintReleasePeriods:boolean},bigBlocks:BigBlock[],releases:Release[]}} Roadmap */
 
-export const COLORS = ['#1976d2', '#7b1fa2', '#00897b', '#e65100', '#c62828', '#455a64', '#558b2f', '#ad1457'];
+// Two rows of 8; each second-row color sits under a related hue. All keep
+// at least 4.5:1 contrast with the white block-header text.
+export const COLORS = [
+  '#1976d2', '#7b1fa2', '#00897b', '#e65100', '#c62828', '#455a64', '#558b2f', '#ad1457',
+  '#283593', '#5e35b1', '#006064', '#9e5d00', '#6d4c41', '#827717', '#1b5e20', '#d81b60',
+];
 export const isMonth = (value) => typeof value === 'string' && /^(?!0000)\d{4}-(0[1-9]|1[0-2])$/.test(value);
 export const monthIndex = (month) => Number(month.slice(0, 4)) * 12 + Number(month.slice(5, 7)) - 1;
 export function indexMonth(index) {

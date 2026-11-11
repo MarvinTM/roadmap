@@ -16,6 +16,10 @@ export default [
     rules: { 'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]', argsIgnorePattern: '^_' }] },
   },
   {
+    files: ['**/*.cjs'],
+    languageOptions: { sourceType: 'commonjs', globals: globals.node },
+  },
+  {
     files: ['client/src/**/*.{js,jsx}'],
     plugins: { 'react-hooks': hooks },
     rules: {
