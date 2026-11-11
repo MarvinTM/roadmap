@@ -15,9 +15,11 @@ describe('roadmap actions', () => {
     doc = apply(doc, { type: 'updateBig', id: 'b', patch: { placement: { start: '2026-11', row: 1 } } });
     const grow = { type: 'updateBig', id: 'a', patch: { rows: 3 } };
     expect(() => changeDocument(doc, grow)).toThrow('Big blocks overlap');
-    const pushed = apply(doc, { ...grow, pushDown: true });
+    const pushed = apply(doc, { ...grow, reflowBelow: true });
     expect(pushed.bigBlocks.find((b) => b.id === 'a')).toMatchObject({ rows: 3, placement: { row: 0 } });
     expect(pushed.bigBlocks.find((b) => b.id === 'b').placement).toEqual({ start: '2026-11', row: 3 });
+    const shrunk = apply(pushed, { type: 'updateBig', id: 'a', patch: { rows: 1 }, reflowBelow: true });
+    expect(shrunk.bigBlocks.find((b) => b.id === 'b').placement).toEqual({ start: '2026-11', row: 1 });
   });
 
   it('preserves shape and contents through unscheduling and rescheduling', () => {

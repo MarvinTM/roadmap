@@ -84,6 +84,52 @@ export function pushDown(blocks, block) {
   return { blocks: blocks.map((b) => next.get(b.id)), moved: [...moved] };
 }
 
+/**
+ * Places `block` (already shrunk from the bottom) and pulls up the blocks that
+ * were stacked directly beneath it: any block touching its old bottom edge,
+ * and transitively any block touching one of those. Each rises only as far as
+ * the free space above it allows, so it never overlaps anything; blocks with
+ * a gap beneath their neighbour stay put. Returns the same shape as pushDown.
+ */
+export function pullUp(blocks, block) {
+  const old = blocks.find((b) => b.id === block.id);
+  const sharesMonths = (a, b) => intervalsOverlap(monthIndex(a.placement.start), a.months, monthIndex(b.placement.start), b.months);
+  const placed = blocks.filter((b) => b.placement && b.id !== block.id);
+  // Blocks stacked beneath the old block, found in the original layout.
+  const stacked = new Set();
+  const queue = [old];
+  while (queue.length) {
+    const above = queue.shift();
+    for (const other of placed) {
+      if (!stacked.has(other.id) && other.placement.row === above.placement.row + above.rows && sharesMonths(above, other)) {
+        stacked.add(other.id);
+        queue.push(other);
+      }
+    }
+  }
+  const originalRow = new Map([...placed, old].map((b) => [b.id, b.placement.row]));
+  const next = new Map(blocks.map((b) => [b.id, b.id === block.id ? block : b]));
+  const moved = [];
+  // Top to bottom, so every block above has already settled.
+  for (const other of placed.filter((b) => stacked.has(b.id)).sort((a, b) => a.placement.row - b.placement.row)) {
+    const above = [...next.values()].filter((b) => b.placement && b.id !== other.id &&
+      originalRow.get(b.id) < originalRow.get(other.id) && sharesMonths(b, other));
+    const floor = Math.max(0, ...above.map((b) => b.placement.row + b.rows));
+    if (floor < other.placement.row) {
+      next.set(other.id, { ...other, placement: { ...other.placement, row: floor } });
+      moved.push(other.id);
+    }
+  }
+  return { blocks: blocks.map((b) => next.get(b.id)), moved };
+}
+
+/** Pushes blocks below down when `block` grew in rows, or pulls stacked ones up when it shrank. */
+export function reflowBelow(blocks, block) {
+  const old = blocks.find((b) => b.id === block.id);
+  if (!old?.placement || !block.placement || block.rows === old.rows) return { blocks: blocks.map((b) => b.id === block.id ? block : b), moved: [] };
+  return block.rows > old.rows ? pushDown(blocks, block) : pullUp(blocks, block);
+}
+
 export function smallFits(parent, item, excludeId = item.id) {
   return integer(item.track) && item.track < parent.rows && integer(item.offset) &&
     integer(item.length, 1) && item.offset + item.length <= parent.months * 4 &&

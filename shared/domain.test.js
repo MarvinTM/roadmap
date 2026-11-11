@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { addMonths, diffMonths, monthIndex, indexMonth, emptyRoadmap, validateRoadmap, bigFits, smallFits, firstSlot, backlogSlot, resizedBig, pushDown, releaseFits, nextReleaseMonth, releasePeriods } from './domain.js';
+import { addMonths, diffMonths, monthIndex, indexMonth, emptyRoadmap, validateRoadmap, bigFits, smallFits, firstSlot, backlogSlot, resizedBig, pushDown, pullUp, reflowBelow, releaseFits, nextReleaseMonth, releasePeriods } from './domain.js';
 
 const item = (patch = {}) => ({ id: 's1', title: 'Story', jiraUrl: null, track: 0, offset: 0, length: 4, ...patch });
 const block = (patch = {}) => ({
@@ -89,6 +89,49 @@ describe('pushing blocks down when a block grows downwards', () => {
     const result = pushDown([a, left, right, below], resizedBig(a, 'bottom', 1));
     expect(rowsOf(result.blocks)).toEqual({ a: 0, left: 2, right: 2, below: 5 });
     expect(validateRoadmap(doc(...result.blocks))).toBe(null);
+  });
+});
+
+describe('pulling stacked blocks up when a block shrinks from the bottom', () => {
+  const at = (id, start, row, months = 1, rows = 1) => block({ id, months, rows, placement: { start, row } });
+  const rowsOf = (blocks) => Object.fromEntries(blocks.map((b) => [b.id, b.placement.row]));
+
+  it('pulls up the block touching its bottom edge and the stack touching that one', () => {
+    const a = at('a', '2026-11', 0, 3, 3);
+    const b = at('b', '2026-12', 3);
+    const c = at('c', '2026-12', 4, 2, 1);
+    const result = pullUp([a, b, c], resizedBig(a, 'bottom', -2));
+    expect(rowsOf(result.blocks)).toEqual({ a: 0, b: 1, c: 2 });
+    expect(result.moved).toEqual(['b', 'c']);
+    expect(validateRoadmap(doc(...result.blocks))).toBe(null);
+  });
+
+  it('leaves blocks separated by a gap, and blocks in other months, where they are', () => {
+    const a = at('a', '2026-11', 0, 2, 3);
+    const gap = at('gap', '2026-11', 4);
+    const elsewhere = at('elsewhere', '2027-03', 3);
+    const result = pullUp([a, gap, elsewhere], resizedBig(a, 'bottom', -2));
+    expect(result.moved).toEqual([]);
+    expect(rowsOf(result.blocks)).toEqual({ a: 0, gap: 4, elsewhere: 3 });
+  });
+
+  it('stops a stacked block at another block above it in a neighbouring month', () => {
+    const a = at('a', '2026-11', 0, 1, 3);
+    const neighbour = at('neighbour', '2026-12', 0, 1, 2);
+    const wide = at('wide', '2026-11', 3, 2, 1); // under a, and under neighbour's month too
+    const result = pullUp([a, neighbour, wide], resizedBig(a, 'bottom', -2));
+    expect(rowsOf(result.blocks)).toEqual({ a: 0, neighbour: 0, wide: 2 });
+    expect(validateRoadmap(doc(...result.blocks))).toBe(null);
+  });
+
+  it('reflowBelow undoes a push when the block shrinks back', () => {
+    const a = at('a', '2026-11', 0, 2, 1);
+    const b = at('b', '2026-11', 1);
+    const c = at('c', '2026-11', 2); // stacked under b
+    const grown = reflowBelow([a, b, c], resizedBig(a, 'bottom', 2)).blocks;
+    expect(rowsOf(grown)).toEqual({ a: 0, b: 3, c: 4 });
+    const back = reflowBelow(grown, { ...grown[0], rows: 1 }).blocks;
+    expect(rowsOf(back)).toEqual({ a: 0, b: 1, c: 2 });
   });
 });
 

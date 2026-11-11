@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { addMonths, bigFits, contentsFit, pushDown, diffMonths, indexMonth, monthIndex, resizedBig, smallFits, backlogSlot, isMonth, releaseFits, formatMonth } from '@roadmap/shared';
+import { addMonths, bigFits, contentsFit, reflowBelow, diffMonths, indexMonth, monthIndex, resizedBig, smallFits, backlogSlot, isMonth, releaseFits, formatMonth } from '@roadmap/shared';
 import { pointInGrid, containsPoint, blockRect, trackAt, blockLabel, ROW_HEIGHT, GRID_HEADER } from '../lib/geometry.js';
 
 export default function useGridDrag({ doc, act, gridRef, colWidthRef }) {
@@ -86,14 +86,16 @@ export default function useGridDrag({ doc, act, gridRef, colWidthRef }) {
             const delta = state.mode === 'bottom' ? Math.round((point.y - state.startGridY) / ROW_HEIGHT) : Math.round((worldQuarter - state.startWorld) / 4);
             block = resizedBig(state.parent, state.mode, delta);
           }
-          // Growing from the bottom pushes the blocks below down instead of colliding.
-          const push = state.mode === 'bottom' && block.rows > state.parent.rows ? pushDown(doc.bigBlocks, block) : null;
-          const blocks = push ? push.blocks : doc.bigBlocks;
-          const pushed = push ? push.blocks.filter((b) => push.moved.includes(b.id)) : [];
+          // Growing from the bottom pushes the blocks below down instead of colliding;
+          // shrinking pulls the blocks stacked beneath it back up.
+          const reflow = state.mode === 'bottom' && block.rows !== state.parent.rows && block.rows >= 1 ? reflowBelow(doc.bigBlocks, block) : null;
+          const blocks = reflow ? reflow.blocks : doc.bigBlocks;
+          const pushed = reflow ? reflow.blocks.filter((b) => reflow.moved.includes(b.id)) : [];
           const valid = contentsFit(block) && bigFits(blocks, block) && pushed.every((b) => bigFits(blocks, b));
-          const pushNote = pushed.length ? ` · pushes ${pushed.length} ${pushed.length === 1 ? 'block' : 'blocks'} down` : '';
+          const direction = block.rows > state.parent.rows ? 'pushes' : 'pulls';
+          const pushNote = pushed.length ? ` · ${direction} ${pushed.length} ${pushed.length === 1 ? 'block' : 'blocks'} ${direction === 'pushes' ? 'down' : 'up'}` : '';
           candidate = { ...candidate, block, pushed, target: 'grid', valid, label: valid ? blockLabel(block) + pushNote : 'Blocked: overlap, bounds, or existing items',
-            action: { type: 'updateBig', id: state.id, patch: block, pushDown: Boolean(push) } };
+            action: { type: 'updateBig', id: state.id, patch: block, reflowBelow: Boolean(reflow) } };
         } else {
           const target = state.mode === 'move'
             ? doc.bigBlocks.find((b) => b.placement && containsPoint(blockRect(b, width, start), point.x, point.y))
