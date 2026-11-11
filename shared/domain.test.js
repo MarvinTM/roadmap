@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { addMonths, diffMonths, monthIndex, indexMonth, emptyRoadmap, validateRoadmap, bigFits, smallFits, firstSlot, backlogSlot, resizedBig } from './domain.js';
+import { addMonths, diffMonths, monthIndex, indexMonth, emptyRoadmap, validateRoadmap, bigFits, smallFits, firstSlot, backlogSlot, resizedBig, releaseFits, nextReleaseMonth, releasePeriods } from './domain.js';
 
 const item = (patch = {}) => ({ id: 's1', title: 'Story', jiraUrl: null, track: 0, offset: 0, length: 4, ...patch });
 const block = (patch = {}) => ({
@@ -73,6 +73,42 @@ describe('document integrity', () => {
   it('accepts empty documents and valid unscheduled content', () => {
     expect(validateRoadmap(emptyRoadmap())).toBe(null);
     expect(validateRoadmap(doc(block({ placement: null, backlogOrder: 0, smallBlocks: [item()] })))).toBe(null);
+  });
+
+  describe('release boundaries', () => {
+    const release = (id, month, color = '#1976d2') => ({ id, month, title: id, color });
+    it('starts in the first visible month, then follows the chronological last release across years', () => {
+      const roadmap = { ...emptyRoadmap(), settings: { ...emptyRoadmap().settings, startMonth: '2026-11' } };
+      expect(nextReleaseMonth(roadmap)).toBe('2026-11');
+      expect(nextReleaseMonth({ ...roadmap, releases: [release('later', '2027-12'), release('earlier', '2026-11')] })).toBe('2028-01');
+    });
+    it('permits crossing but rejects another release at the same boundary or invalid months', () => {
+      const releases = [release('first', '2026-11'), release('second', '2027-01')];
+      expect(releaseFits(releases, release('first', '2027-02'))).toBe(true);
+      expect(releaseFits(releases, releases[0])).toBe(true);
+      expect(releaseFits(releases, release('first', '2027-01'))).toBe(false);
+      expect(releaseFits(releases, release('first', '2026-13'))).toBe(false);
+    });
+    it('clips periods to the view, includes the ending month, and leaves time after the last release clear', () => {
+      const releases = [release('last', '2027-02'), release('first', '2026-11', '#00897b')];
+      expect(releasePeriods(releases, '2026-10', 6)).toEqual([
+        { id: 'first', color: '#00897b', left: 0, width: 2 },
+        { id: 'last', color: '#1976d2', left: 2, width: 3 },
+      ]);
+      expect(releasePeriods(releases, '2026-12', 6)).toEqual([{ id: 'last', color: '#1976d2', left: 0, width: 3 }]);
+      expect(releasePeriods(releases, '2027-03', 6)).toEqual([]);
+      expect(releasePeriods([release('future', '2028-01')], '2026-11', 6)).toEqual([{ id: 'future', color: '#1976d2', left: 0, width: 6 }]);
+    });
+    it('rejects invalid releases and IDs shared with blocks or stories', () => {
+      const roadmap = doc(block({ smallBlocks: [item()] }));
+      for (const bad of [
+        release('b1', '2026-11'), release('s1', '2026-11'),
+        { ...release('r', '2026-11'), title: ' ' }, { ...release('r', '2026-11'), color: 'red' },
+        release('r', '0000-01'),
+      ]) expect(validateRoadmap({ ...roadmap, releases: [bad] })).not.toBeNull();
+      expect(validateRoadmap({ ...roadmap, releases: [release('a', '2026-11'), release('b', '2026-11')] })).toMatch(/same month/);
+      expect(validateRoadmap({ ...roadmap, releases: [release('r', '2026-11')] })).toBeNull();
+    });
   });
   it.each([
     ['duplicate IDs', () => doc(block({ smallBlocks: [item({ id: 'b1' })] }))],

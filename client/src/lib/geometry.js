@@ -3,7 +3,9 @@ import { addMonths, diffMonths, formatMonth } from '@roadmap/shared';
 export const ROW_HEIGHT = 64;
 export const HEADER_HEIGHT = 24;
 export const MONTH_HEADER = 40;
-export const GRID_TOP = MONTH_HEADER + 8;
+export const RELEASE_HEADER = 28;
+export const GRID_HEADER = MONTH_HEADER + RELEASE_HEADER;
+export const GRID_TOP = GRID_HEADER + 8;
 export const columnWidth = (width, months) => Math.max(120, width / months);
 
 export function pointInGrid(element, x, y, width, startMonth) {
@@ -15,7 +17,7 @@ export function pointInGrid(element, x, y, width, startMonth) {
     month: addMonths(startMonth, Math.floor(gridX / width)),
     quarter: Math.floor(gridX / (width / 4)),
     row: Math.floor(gridY / ROW_HEIGHT),
-    inside: x >= rect.left && x < rect.right && y >= rect.top + MONTH_HEADER && y < rect.bottom && gridY >= 0,
+    inside: x >= rect.left && x < rect.right && y >= rect.top + GRID_HEADER && y < rect.bottom && gridY >= 0,
   };
 }
 

@@ -21,6 +21,47 @@ describe('roadmap actions', () => {
     expect(doc.bigBlocks[0].smallBlocks).toEqual(original.smallBlocks);
     expect(doc.bigBlocks[0].backlogOrder).toBeNull();
   });
+
+  describe('release actions', () => {
+    const add = (doc, id, month) => apply(doc, { type: 'addRelease', id, title: id, month });
+    it('reveals new off-screen releases with the smallest window shift and keeps view length', () => {
+      let doc = apply(setup(true), { type: 'settings', settings: { startMonth: '2026-11', monthsVisible: 6 } });
+      const blocks = structuredClone(doc.bigBlocks);
+      doc = add(doc, 'first');
+      expect(doc.releases[0].month).toBe('2026-11');
+      doc = add(doc, 'future', '2028-07');
+      expect(doc.settings.startMonth).toBe('2028-02');
+      doc = add(doc, 'next');
+      expect(doc.releases.at(-1).month).toBe('2028-08');
+      expect(doc.settings).toMatchObject({ startMonth: '2028-03', monthsVisible: 6 });
+      expect(doc.bigBlocks).toEqual(blocks);
+    });
+    it('reorders crossing releases without changing identities, colors or block contents', () => {
+      let doc = add(add(setup(true), 'first', '2026-11'), 'second', '2027-01');
+      const first = doc.releases[0];
+      const blocks = structuredClone(doc.bigBlocks);
+      doc = apply(doc, { type: 'updateRelease', id: 'first', patch: { month: '2027-02' } });
+      expect(doc.releases.map((release) => release.id)).toEqual(['second', 'first']);
+      expect(doc.releases[1]).toEqual({ ...first, month: '2027-02' });
+      expect(doc.bigBlocks).toEqual(blocks);
+      expect(() => apply(doc, { type: 'updateRelease', id: 'first', patch: { month: '2027-01' } })).toThrow(/same month/);
+    });
+    it('deletes only the boundary and undoes without reverting subsequent edits', () => {
+      let doc = add(setup(true), 'r1', '2026-11');
+      const deletion = changeDocument(doc, { type: 'deleteRelease', id: 'r1' });
+      doc = apply(deletion.doc, { type: 'updateBig', id: 'a', patch: { title: 'Keep later edits' } });
+      doc = apply(doc, { type: 'restore', undo: deletion.undo });
+      expect(doc.releases).toEqual([deletion.undo.release]);
+      expect(doc.bigBlocks[0].title).toBe('Keep later edits');
+    });
+    it('refuses Undo if the original month has been taken, leaving other releases untouched', () => {
+      const deletion = changeDocument(add(setup(), 'original', '2026-11'), { type: 'deleteRelease', id: 'original' });
+      const doc = add(deletion.doc, 'replacement', '2026-11');
+      const snapshot = structuredClone(doc);
+      expect(() => apply(doc, { type: 'restore', undo: deletion.undo })).toThrow('Cannot undo');
+      expect(doc).toEqual(snapshot);
+    });
+  });
   it('shortens new items to free space and refuses a full scheduled block', () => {
     let doc = setup(true);
     doc = apply(doc, { type: 'addSmall', parentId: 'a', id: 's', slot: { track: 0, offset: 2 } });

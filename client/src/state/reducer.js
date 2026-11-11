@@ -1,4 +1,4 @@
-import { backlogSlot, firstSlot, validateRoadmap, COLORS, bigFits, smallFits } from '@roadmap/shared';
+import { backlogSlot, firstSlot, validateRoadmap, COLORS, bigFits, smallFits, nextReleaseMonth, sortedReleases, revealRelease, releaseFits } from '@roadmap/shared';
 
 const nextOrder = (doc) => Math.max(-1, ...doc.bigBlocks.map((b) => b.backlogOrder ?? -1)) + 1;
 const findBig = (doc, id) => {
@@ -12,6 +12,31 @@ export function changeDocument(doc, action) {
   let next = doc;
   let undo;
   switch (action.type) {
+    case 'addRelease': {
+      const release = {
+        id: action.id, title: action.title.trim(), month: action.month || nextReleaseMonth(doc),
+        color: action.color || COLORS[doc.releases.length % COLORS.length],
+      };
+      next = { ...doc, releases: sortedReleases([...doc.releases, release]), settings: revealRelease(doc.settings, release.month) };
+      break;
+    }
+    case 'updateRelease': {
+      const original = doc.releases.find((release) => release.id === action.id);
+      if (!original) throw new Error('That release no longer exists.');
+      const release = { ...original, ...action.patch };
+      next = {
+        ...doc, releases: sortedReleases(doc.releases.map((r) => r.id === release.id ? release : r)),
+        settings: action.reveal ? revealRelease(doc.settings, release.month) : doc.settings,
+      };
+      break;
+    }
+    case 'deleteRelease': {
+      const release = doc.releases.find((release) => release.id === action.id);
+      if (!release) throw new Error('That release no longer exists.');
+      undo = { kind: 'release', release };
+      next = { ...doc, releases: doc.releases.filter((r) => r.id !== action.id) };
+      break;
+    }
     case 'settings':
       next = { ...doc, settings: { ...doc.settings, ...action.settings } };
       break;
@@ -76,7 +101,10 @@ export function changeDocument(doc, action) {
     }
     case 'restore': {
       const saved = action.undo;
-      if (saved.kind === 'big') {
+      if (saved.kind === 'release') {
+        if (!releaseFits(doc.releases, saved.release)) throw new Error('Cannot undo: another release already ends in that month.');
+        next = { ...doc, releases: sortedReleases([...doc.releases, saved.release]) };
+      } else if (saved.kind === 'big') {
         const block = { ...saved.block };
         if (!bigFits(doc.bigBlocks, block)) block.placement = null;
         block.backlogOrder = block.placement ? null : nextOrder(doc);

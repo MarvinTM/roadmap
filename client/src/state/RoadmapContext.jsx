@@ -54,7 +54,7 @@ export function RoadmapProvider({ children }) {
   }, [load]);
 
   const save = useCallback(async (overwrite = false) => {
-    if (busy.current || !current.current.doc) return;
+    if (busy.current || !current.current.doc || (!overwrite && current.current.version === savedVersion.current)) return;
     busy.current = true;
     setStatus('saving');
     try {
@@ -72,7 +72,7 @@ export function RoadmapProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    if (!state.doc || ['loading', 'loadError', 'error', 'conflict'].includes(status) || state.version === savedVersion.current) return;
+    if (!state.doc || ['loading', 'loadError', 'saving', 'error', 'conflict'].includes(status) || state.version === savedVersion.current) return;
     const timer = setTimeout(() => save(), Math.max(0, 500 - (Date.now() - lastChange.current)));
     return () => clearTimeout(timer);
   }, [state.doc, state.version, status, retry, save]);

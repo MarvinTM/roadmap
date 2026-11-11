@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { addMonths, bigFits, contentsFit, diffMonths, indexMonth, monthIndex, resizedBig, smallFits, backlogSlot, isMonth } from '@roadmap/shared';
-import { pointInGrid, containsPoint, blockRect, trackAt, blockLabel, ROW_HEIGHT } from '../lib/geometry.js';
+import { addMonths, bigFits, contentsFit, diffMonths, indexMonth, monthIndex, resizedBig, smallFits, backlogSlot, isMonth, releaseFits, formatMonth } from '@roadmap/shared';
+import { pointInGrid, containsPoint, blockRect, trackAt, blockLabel, ROW_HEIGHT, GRID_HEADER } from '../lib/geometry.js';
 
 export default function useGridDrag({ doc, act, gridRef, colWidthRef }) {
   const [preview, setPreview] = useState(null);
@@ -16,7 +16,9 @@ export default function useGridDrag({ doc, act, gridRef, colWidthRef }) {
     const grid = gridRef.current;
     if (!grid) return;
     const { doc } = latest.current;
-    const parent = doc.bigBlocks.find((b) => b.id === (spec.parentId || spec.id));
+    const parent = spec.kind === 'release'
+      ? doc.releases.find((release) => release.id === spec.id)
+      : doc.bigBlocks.find((b) => b.id === (spec.parentId || spec.id));
     if (!parent) return;
     const item = spec.kind === 'small' ? parent.smallBlocks.find((s) => s.id === spec.id) : null;
     const width = colWidthRef.current;
@@ -43,12 +45,21 @@ export default function useGridDrag({ doc, act, gridRef, colWidthRef }) {
       const width = colWidthRef.current;
       const start = doc.settings.startMonth;
       const point = pointInGrid(grid, state.x, state.y, width, start);
+      const worldQuarter = monthIndex(start) * 4 + point.x / (width / 4);
       const trash = document.querySelector('[data-trash]');
       const backlog = document.querySelector('[data-backlog]');
       const overTrash = trash && containsPoint(trash.getBoundingClientRect(), state.x, state.y);
       const overBacklog = backlog && containsPoint(backlog.getBoundingClientRect(), state.x, state.y);
       let candidate = { kind: state.kind, valid: false, target: 'none', x: state.x, y: state.y, label: 'Drop onto a block or the roadmap' };
-      if (state.mode === 'move' && overTrash) {
+      if (state.kind === 'release') {
+        const bounds = grid.getBoundingClientRect();
+        const overGrid = containsPoint(bounds, state.x, state.y);
+        const release = { ...state.parent, month: addMonths(state.parent.month, Math.round((worldQuarter - state.startWorld) / 4)) };
+        const valid = overGrid && releaseFits(doc.releases, release);
+        candidate = { ...candidate, release, target: overGrid ? 'grid' : 'none', valid,
+          label: valid ? `${release.title} · ends ${formatMonth(release.month)}` : overGrid ? 'Blocked: another release ends here, or invalid month' : 'Keep the release on the calendar',
+          action: { type: 'updateRelease', id: state.id, patch: { month: release.month }, reveal: true } };
+      } else if (state.mode === 'move' && overTrash) {
         candidate = { ...candidate, target: 'trash', valid: true, label: 'Delete · Undo available', action: state.kind === 'big' ? { type: 'deleteBig', id: state.id } : { type: 'deleteSmall', parentId: state.parentId, id: state.id } };
       } else if (state.mode === 'move' && overBacklog) {
         if (state.kind === 'big') {
@@ -64,7 +75,6 @@ export default function useGridDrag({ doc, act, gridRef, colWidthRef }) {
           } else candidate.label = 'Drop onto a backlog card';
         }
       } else if (point.inside) {
-        const worldQuarter = monthIndex(start) * 4 + point.x / (width / 4);
         if (state.kind === 'big') {
           let block;
           if (state.mode === 'move') {
@@ -123,7 +133,7 @@ export default function useGridDrag({ doc, act, gridRef, colWidthRef }) {
           const edge = 38;
           const speed = (position, min, max) => position < min + edge ? -Math.min(16, (min + edge - position) / 2) : position > max - edge ? Math.min(16, (position - max + edge) / 2) : 0;
           const dx = speed(state.x, rect.left, rect.right) * elapsed;
-          const dy = speed(state.y, rect.top + 40, rect.bottom) * elapsed;
+          const dy = state.kind === 'release' ? 0 : speed(state.y, rect.top + GRID_HEADER, rect.bottom) * elapsed;
           if (dy > 0 && grid.scrollTop + grid.clientHeight >= grid.scrollHeight - 4) {
             setExtraRows(Math.ceil((grid.scrollTop + grid.clientHeight) / ROW_HEIGHT) + 2);
           }
@@ -147,7 +157,7 @@ export default function useGridDrag({ doc, act, gridRef, colWidthRef }) {
         } else {
           state.edgeDirection = 0;
           const cards = document.querySelector('.backlog-cards');
-          if (cards && containsPoint(cards.getBoundingClientRect(), state.x, state.y)) {
+          if (state.kind !== 'release' && cards && containsPoint(cards.getBoundingClientRect(), state.x, state.y)) {
             const bounds = cards.getBoundingClientRect();
             if (state.y < bounds.top + 32) cards.scrollTop -= 8 * elapsed;
             if (state.y > bounds.bottom - 32) cards.scrollTop += 8 * elapsed;

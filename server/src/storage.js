@@ -1,5 +1,6 @@
 import { mkdir, readFile, writeFile, rename, copyFile, open, unlink } from 'node:fs/promises';
 import { dirname } from 'node:path';
+import { constants } from 'node:fs';
 import { emptyRoadmap, validateRoadmap } from '@roadmap/shared';
 
 export class StorageError extends Error {
@@ -21,13 +22,30 @@ export function createStorage(file) {
     await rename(`${file}.tmp`, file);
   }
   async function load() {
+    let fileRead = false;
     try {
-      const doc = JSON.parse(await readFile(file, 'utf8'));
-      const error = validateRoadmap(doc);
+      const contents = await readFile(file, 'utf8');
+      fileRead = true;
+      const doc = JSON.parse(contents);
+      const error = validateRoadmap(doc, { allowLegacy: true });
       if (error) throw new Error(error);
+      if (doc.schemaVersion === 1) {
+        const upgraded = {
+          ...doc, schemaVersion: 2, revision: doc.revision + 1, updatedAt: new Date().toISOString(),
+          settings: { ...doc.settings, tintReleasePeriods: false }, releases: [],
+        };
+        const upgradeError = validateRoadmap(upgraded);
+        if (upgradeError) throw new Error(upgradeError);
+        await copyFile(file, `${file}.v1.bak`, constants.COPYFILE_EXCL).catch((error) => {
+          if (error.code !== 'EEXIST') throw error;
+        });
+        await copyFile(file, `${file}.bak`);
+        await atomicWrite(upgraded);
+        return upgraded;
+      }
       return doc;
     } catch (error) {
-      if (error.code !== 'ENOENT') throw new StorageError(500, 'The roadmap file cannot be read. Restore a valid file or its .bak backup; the existing file has not been replaced.');
+      if (fileRead || error.code !== 'ENOENT') throw new StorageError(500, 'The roadmap file cannot be read. Restore a valid file or its .bak backup; the existing file has not been replaced.');
       const doc = emptyRoadmap();
       await atomicWrite(doc);
       return doc;

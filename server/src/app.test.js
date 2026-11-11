@@ -38,3 +38,17 @@ it('rejects cross-origin writes, but permits same-origin proxied browser writes'
   expect((await put('https://unrelated.example')).status).toBe(403);
   expect((await put(url)).status).toBe(200);
 });
+
+it('persists releases and rejects duplicate boundaries and old-client saves without losing data', async () => {
+  const doc = await (await fetch(`${url}/api/roadmap`)).json();
+  const release = { id: 'r1', title: 'Launch', month: '2027-01', color: '#1976d2' };
+  const put = (body) => fetch(`${url}/api/roadmap`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  expect((await put({ ...doc, releases: [release] })).status).toBe(200);
+  const saved = await (await fetch(`${url}/api/roadmap`)).json();
+  expect(saved.releases).toEqual([release]);
+  expect((await put({ ...saved, releases: [release, { ...release, id: 'r2' }] })).status).toBe(400);
+  const legacy = { ...doc, schemaVersion: 1, revision: saved.revision };
+  delete legacy.releases;
+  expect((await put(legacy)).status).toBe(400);
+  expect((await (await fetch(`${url}/api/roadmap`)).json()).releases).toEqual([release]);
+});

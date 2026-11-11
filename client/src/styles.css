@@ -24,7 +24,18 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .trash-active { outline: 2px dashed #c62828; color: #c62828; background: #ffebee; }
 .grid-scroll { flex: 1; min-width: 0; overflow: auto; position: relative; background: #fff; overscroll-behavior: contain; }
 .grid-content { position: relative; }
-.month-header { display: flex; position: sticky; top: 0; z-index: 3; background: #f9fbfe; border-bottom: 1px solid #dfe4eb; }
+.calendar-header { position: sticky; top: 0; z-index: 4; background: #f9fbfe; }
+.month-header { display: flex; background: #f9fbfe; border-bottom: 1px solid #dfe4eb; }
+.release-strip { position: relative; border-bottom: 1px solid #dfe4eb; overflow: hidden; }
+.release-empty { position: absolute; left: 12px; top: 6px; font-size: 10px; color: #8490a2; pointer-events: none; }
+.release-label { position: absolute; top: 3px; height: 22px; display: flex; align-items: center; gap: 2px; padding-left: 6px; border-right: 2px solid; border-radius: 4px 0 0 4px; }
+.release-grab { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 650; cursor: grab; touch-action: none; }
+.release-tint { position: absolute; top: 0; bottom: 0; opacity: 0.055; pointer-events: none; }
+.release-boundary { position: absolute; top: 0; bottom: 0; border-left: 2px dashed; opacity: 0.7; pointer-events: none; z-index: 2; }
+.release-header-preview { position: absolute; top: 0; bottom: 0; border-left: 2px dashed; pointer-events: none; z-index: 2; }
+.release-preview { opacity: 1; z-index: 6; }
+.release-preview.valid, .release-header-preview.valid { border-color: #1976d2; }
+.release-preview.invalid, .release-header-preview.invalid { border-color: #d32f2f; }
 .month-label { flex-shrink: 0; border-right: 1px solid #dfe4eb; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; font-weight: 650; }
 .month-label small { font-size: 10px; color: #657387; font-weight: 400; }
 .current-month { background-color: #1976d20c; }

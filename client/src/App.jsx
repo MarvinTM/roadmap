@@ -7,6 +7,7 @@ import Backlog from './components/Backlog.jsx';
 import Grid from './components/Grid.jsx';
 import EditDialog, { LeftResizeDialog } from './components/EditDialog.jsx';
 import JiraLinkPopover from './components/JiraLinkPopover.jsx';
+import ReleaseDialog from './components/ReleaseDialog.jsx';
 
 export default function App() {
   const { doc, act, status, message, reload, overwrite, undo, error } = useRoadmap();
@@ -30,7 +31,7 @@ export default function App() {
     setExpanded((old) => new Set([...old, parentId]));
     setEditing(id);
   };
-  const ui = { editing, setEditing, addSmall, openMenu: (event, type, id, parentId) => {
+  const ui = { editing, setEditing, addSmall, editRelease: (id, focus) => setDialog({ type: 'release', id, focus }), openMenu: (event, type, id, parentId) => {
     event.stopPropagation(); setMenu({ anchor: event.currentTarget, type, id, parentId });
   } };
   if (!doc) return <Box sx={{ height: '100vh', display: 'grid', placeItems: 'center', p: 4 }}>
@@ -43,7 +44,7 @@ export default function App() {
       <TopBar onAdd={() => {
         const id = crypto.randomUUID();
         act({ type: 'addBig', id }); setCollapsed(false); setEditing(id);
-      }} />
+      }} onAddRelease={() => setDialog({ type: 'release' })} />
       <div className="workspace">
         <Backlog ui={ui} begin={drag.begin} collapsed={collapsed} setCollapsed={setCollapsed} expanded={expanded} setExpanded={setExpanded} preview={drag.preview} />
         <Grid doc={doc} gridRef={gridRef} colWidthRef={colWidthRef} ui={ui} begin={drag.begin} preview={drag.preview} extraRows={drag.extraRows} />
@@ -57,8 +58,8 @@ export default function App() {
           pendingMenuAction.current = null;
           action?.();
         } } }}>
-        <MenuItem onClick={() => runMenu(() => setEditing(menu.id))}>Rename</MenuItem>
-        <MenuItem onClick={() => runMenu(() => setDialog({ ...menu, anchor: undefined }))}>{menu?.type === 'big' ? 'Schedule, move, resize & color' : 'Move, resize & edit'}</MenuItem>
+        <MenuItem onClick={() => runMenu(() => menu.type === 'release' ? setDialog({ type: 'release', id: menu.id }) : setEditing(menu.id))}>Rename</MenuItem>
+        <MenuItem onClick={() => runMenu(() => setDialog({ ...menu, anchor: undefined }))}>{menu?.type === 'release' ? 'Change month & color' : menu?.type === 'big' ? 'Schedule, move, resize & color' : 'Move, resize & edit'}</MenuItem>
         {menu?.type === 'big' && [
           <MenuItem key="add" onClick={() => runMenu(() => addSmall(menu.id))}>Add item</MenuItem>,
           menuParent?.placement && <MenuItem key="left" onClick={() => runMenu(() => setDialog({ type: 'left', id: menu.id }))}>Resize from left</MenuItem>,
@@ -66,10 +67,11 @@ export default function App() {
         ]}
         {menu?.type === 'small' && <MenuItem onClick={() => runMenu(() => setDialog({ ...menu, type: 'link' }))}>Edit link</MenuItem>}
         <Divider />
-        <MenuItem sx={{ color: 'error.main' }} onClick={() => runMenu(() => act(menu.type === 'big' ? { type: 'deleteBig', id: menu.id } : { type: 'deleteSmall', parentId: menu.parentId, id: menu.id }))}>Delete</MenuItem>
+        <MenuItem sx={{ color: 'error.main' }} onClick={() => runMenu(() => act(menu.type === 'release' ? { type: 'deleteRelease', id: menu.id } : menu.type === 'big' ? { type: 'deleteBig', id: menu.id } : { type: 'deleteSmall', parentId: menu.parentId, id: menu.id }))}>Delete</MenuItem>
       </Menu>
       {dialog && (dialog.type === 'left'
         ? <LeftResizeDialog key={dialog.id} block={doc.bigBlocks.find((b) => b.id === dialog.id)} onClose={() => setDialog(null)} />
+        : dialog.type === 'release' ? <ReleaseDialog key={dialog.id || 'new-release'} selection={dialog} onClose={() => setDialog(null)} />
         : dialog.type === 'link' ? <JiraLinkPopover key={dialog.id} selection={dialog} onClose={() => setDialog(null)} />
         : <EditDialog key={dialog.id} selection={dialog} onClose={() => setDialog(null)} />)}
       <Snackbar open={Boolean(undo)} key={undo?.token || 'undo'} message="Deleted" anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}

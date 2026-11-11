@@ -1,9 +1,9 @@
-import { AppBar, Toolbar, Typography, IconButton, Button, TextField, Tooltip, Chip } from '@mui/material';
-import { ChevronLeft, ChevronRight, Today, Add, Remove, CheckCircleOutline, Sync, ErrorOutline } from '@mui/icons-material';
+import { AppBar, Toolbar, Typography, IconButton, Button, TextField, Tooltip, Chip, Checkbox, FormControlLabel } from '@mui/material';
+import { ChevronLeft, ChevronRight, Today, Add, Remove, CheckCircleOutline, Sync, ErrorOutline, FlagOutlined } from '@mui/icons-material';
 import { addMonths, currentMonth } from '@roadmap/shared';
 import { useRoadmap } from '../state/RoadmapContext.jsx';
 
-export default function TopBar({ onAdd }) {
+export default function TopBar({ onAdd, onAddRelease }) {
   const { doc, act, status, message, retrySave } = useRoadmap();
   const { startMonth, monthsVisible } = doc.settings;
   const settings = (patch) => act({ type: 'settings', settings: patch });
@@ -20,7 +20,11 @@ export default function TopBar({ onAdd }) {
         <IconButton aria-label="Show fewer months" size="small" disabled={monthsVisible <= 3} onClick={() => settings({ monthsVisible: monthsVisible - 1 })}><Remove fontSize="small" /></IconButton>
         <Typography aria-label="Visible months" sx={{ minWidth: 24, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{monthsVisible}</Typography>
         <IconButton aria-label="Show more months" size="small" disabled={monthsVisible >= 36} onClick={() => settings({ monthsVisible: monthsVisible + 1 })}><Add fontSize="small" /></IconButton>
-        <Button variant="contained" startIcon={<Add />} onClick={onAdd} sx={{ ml: 'auto', whiteSpace: 'nowrap' }}>Big block</Button>
+        <FormControlLabel sx={{ mr: 0, '& .MuiFormControlLabel-label': { fontSize: 12, whiteSpace: 'nowrap' } }}
+          control={<Checkbox size="small" checked={doc.settings.tintReleasePeriods} onChange={(event) => settings({ tintReleasePeriods: event.target.checked })} />}
+          label="Tint release periods" />
+        <Button variant="outlined" startIcon={<FlagOutlined />} onClick={onAddRelease} sx={{ ml: 'auto', whiteSpace: 'nowrap' }}>Release</Button>
+        <Button variant="contained" startIcon={<Add />} onClick={onAdd} sx={{ whiteSpace: 'nowrap' }}>Big block</Button>
         <Tooltip title={['error', 'conflict'].includes(status) ? message : 'Changes are saved automatically to this computer'}>
           <Chip
             size="small" aria-live="polite" label={labels[status] || status}

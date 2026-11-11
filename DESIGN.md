@@ -1,6 +1,6 @@
 # aiRoadmap: Design Document
 
-Status: **v4, implemented**
+Status: **v5, implemented**
 Date: 2026-11-11
 
 ## 1. Goal
@@ -25,6 +25,7 @@ A lightweight, single-user web app for managing a personal roadmap. You create *
 | **Small block** | A bar inside a big block. It sits on one track and covers a range of **quarter-months** (minimum 1 quarter, i.e. ¼ of a month column). It has a title and an optional Jira link. |
 | **Quarter (q)** | The unit for positioning small blocks: ¼ of a month column. It is a visual subdivision and is not tied to calendar days. |
 | **Backlog** | A side panel of unscheduled big blocks. |
+| **Release** | A named, colored boundary at the end of a month. It marks the end of a calendar period, independently of blocks or stories. |
 
 ## 3. UI Layout
 
@@ -56,10 +57,11 @@ A lightweight, single-user web app for managing a personal roadmap. You create *
     - **From** is a month picker for the first visible month.
     - **Months** is a stepper (`–` / `+`, range 3–36) for the number of visible months.
   - A **+ Big block** button.
+  - A **Release** creation button and a saved **Tint release periods** checkbox, off by default.
   - A save-status indicator (saved / saving / error).
 - **Backlog (left, collapsible)**: compact cards for unscheduled big blocks, showing the title, shape (e.g. "2m × 1r") and item count. Clicking a card's chevron expands it to show a compact list of its small blocks, which can be dragged out onto big blocks on the grid. Cards are also drop targets for small blocks (see 4.2). There is a trash drop zone at the bottom.
 - **Grid**:
-  - A sticky month header, with the current month tinted and a stronger divider at year boundaries.
+  - A sticky month header, with the current month tinted and a stronger divider at year boundaries. A 28 px release-label strip sticks immediately below it. Each release header spans the period from the previous release boundary to its own boundary, clipped to the visible calendar range, independently of the tint toggle.
   - Rows have a fixed height. There is always at least one empty row at the bottom as a drop target, and trailing empty rows beyond that are trimmed.
   - The grid is its own scroll container and scrolls **horizontally and vertically**. The month header stays sticky at the top, and the top bar and backlog stay fixed.
   - Faint quarter-month tick lines are shown inside big blocks, and while dragging a small block.
@@ -121,6 +123,22 @@ A lightweight, single-user web app for managing a personal roadmap. You create *
 - Big blocks that extend outside the visible window are drawn clipped, with a ◀ / ▶ fade showing that they continue.
 - Dragging near any edge of the grid auto-scrolls it: up and down vertically, and left and right horizontally. When the scroll reaches the end of the visible window, the window shifts by a month.
 
+### 4.4 Releases
+| Action | Gesture | Result |
+|---|---|---|
+| Create | Top bar → Release | A dialog asks for a name, with an editable default end month and automatically selected color. Cancel creates nothing. The first release defaults to the first visible month; subsequent releases default to one month after the chronologically last release. The view shifts only as much as necessary to reveal it. |
+| Move | Drag a release label horizontally | The boundary snaps to whole months. A November release appears between November and December. Labels preserve their grab offset, with blue/red boundary previews. |
+| Rename / month / color | Label menu → Rename or Change month & color | Opens the release dialog. Focusing a label and pressing Enter or Space opens it with the month field focused, providing a keyboard alternative to dragging. |
+| Tint | Top bar → Tint release periods | Adds very faint release-colored backgrounds without replacing block colors. This setting is saved. |
+| Delete | Label menu → Delete | Removes only the release boundary, with five-second Undo. Blocks and stories are unchanged. |
+
+**Rules**
+- Releases may cross and are sorted chronologically, retaining their IDs, names and colors. Two releases cannot end in the same month: invalid drops snap back and invalid form edits leave the dialog open.
+- A release colors the period ending at its boundary, including the ending month. Before the first boundary, use the first release's color; between boundaries, use the color of the release ending that period. After the last boundary, leave the calendar untinted. Off-screen boundaries still determine the correctly clipped shading.
+- Release lines and tints never intercept clicks or block gestures. Only labels initiate release dragging. A release cannot be dragged into the backlog or trash.
+- Release dragging uses horizontal auto-scroll and the existing delayed month-window shifting, including when dragging in the sticky strip. It never scrolls vertically or grows the row count. Escape, pointer cancellation and window blur cancel the gesture.
+- Undo restores the original boundary without reverting subsequent edits. If another release now occupies that month, Undo shows a conflict message and leaves both the existing release and all blocks untouched.
+
 ## 5. Architecture
 
 ```
@@ -138,7 +156,7 @@ A lightweight, single-user web app for managing a personal roadmap. You create *
 | Language | **Plain JavaScript (ES modules)**. Data shapes are documented with JSDoc. | As requested |
 | Frontend build | **Vite** (React template, JS) | Fast, minimal config |
 | UI | **MUI v6** (`@mui/material`, `@mui/icons-material`) | As requested |
-| Drag & drop | One **custom pointer-events engine** (`useGridDrag` hook) for grid moves/resizes, backlog transfers, and trash drops. No dnd-kit. | Shared snapping, hit-testing, collision checks, previews, cancellation, and scrolling avoid coordinating two gesture engines. Menus provide keyboard-accessible alternatives. |
+| Drag & drop | One **custom pointer-events engine** (`useGridDrag` hook) for grid moves/resizes, backlog transfers, trash drops, and horizontal release-label moves. No dnd-kit. | Shared snapping, hit-testing, collision checks, previews, cancellation, and scrolling avoid coordinating two gesture engines. Menus provide keyboard-accessible alternatives. |
 | State | `useReducer` + Context | The app is small |
 | IDs | `crypto.randomUUID()` | Built in |
 | Months | Stored as `"YYYY-MM"`, with small helpers (`addMonths`, `diffMonths`, `monthIndex`) | No date library is needed |
@@ -169,6 +187,7 @@ aiRoadmap/
          ├─ TopBar.jsx, RangeWidget.jsx, SaveIndicator.jsx
          ├─ Backlog.jsx, BacklogCard.jsx, TrashZone.jsx
          ├─ Grid.jsx, MonthHeader.jsx, GridBackground.jsx, DragGhost.jsx
+         ├─ ReleaseHeader.jsx, ReleaseDialog.jsx
          ├─ BigBlock.jsx, BigBlockHeader.jsx, Track.jsx
          └─ SmallBlock.jsx, JiraLinkPopover.jsx
 ```
@@ -179,12 +198,13 @@ aiRoadmap/
 
 ```jsonc
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "revision": 42,                    // incremented on every save
   "updatedAt": "2026-11-10T10:00:00Z",
   "settings": {
     "startMonth": "2026-11",         // first visible month
-    "monthsVisible": 12              // 3–36
+    "monthsVisible": 12,             // 3–36
+    "tintReleasePeriods": false
   },
   "bigBlocks": [
     {
@@ -207,6 +227,14 @@ aiRoadmap/
           "offset": 0,               // quarters from the big block's start (≥ 0)
           "length": 4                // quarters (≥ 1); offset + length ≤ months × 4
         }
+      ],
+      "releases": [
+        {
+          "id": "r3a…",                 // globally unique, including block/story IDs
+          "title": "Public launch",
+          "month": "2027-01",           // boundary after January; unique among releases
+          "color": "#00897b"
+        }
       ]
     }
   ]
@@ -217,6 +245,7 @@ Design notes:
 - A big block's shape (`months`, `rows`) is stored separately from its `placement`, so unscheduling and rescheduling preserves both its shape and its contents.
 - Small block positions are **relative** to their big block, so moving the big block moves its contents for free. Moving a small block to another scheduled big block follows the pointer at the target quarter, preserving the grab offset and item length; it does not preserve the original calendar date.
 - Rows are plain integers. Blocks may leave empty rows between them, which is allowed. Trailing empty rows are not stored, because the grid height is derived from the content.
+- Releases reference calendar months, not blocks or stories. Moving or deleting a release never changes block contents, geometry or assignment.
 
 ## 7. Backend API
 
@@ -232,7 +261,9 @@ Server behavior:
 - **Atomic writes**: the server writes `roadmap.json.tmp` and then `rename`s it over the real file.
 - **Serialized writes**: an in-process promise queue ensures that writes never interleave.
 - **Backup**: the previous file is copied to `roadmap.json.bak` before each write.
-- **Validation**: checks the document shape, month format and numeric ranges. It also enforces the integrity rules: big blocks never share a cell, and small blocks are within bounds and don't overlap on a track.
+- **Schema upgrade**: a valid schema-1 file is upgraded on first load, preserving blocks and range settings, adding empty releases and tinting off, and advancing the revision once. The original is retained byte-for-byte in `roadmap.json.v1.bak`, which subsequent saves never overwrite. The upgraded file is written atomically. Invalid legacy files are reported without replacement.
+- **Old clients**: schema-1 PUTs and incomplete schema-2 documents are rejected, preventing older tabs from silently erasing release data. Reload the page after upgrading.
+- **Validation**: checks the document shape, month format and numeric ranges. It also enforces the integrity rules: big blocks never share a cell, small blocks are within bounds and don't overlap on a track, and release months and all object IDs are unique.
 - **Production**: `express.static` serves `client/dist`, so there is a single port (default `3001`). In dev, Vite proxies `/api` to it.
 
 **Client persistence**: every action updates the UI immediately, and `useAutosave` PUTs the document about 500 ms after the last change (debounced). Previews during a drag are local and only saved on drop. On a save error, the indicator turns red and offers a retry. On `409`, a dialog offers "Reload latest" or "Overwrite".
@@ -247,6 +278,7 @@ Server behavior:
 - A **4 px movement threshold** before starting a drag, so that double-click to edit still works.
 - **Hit-testing for cross-block small-block moves**: on each move, the engine finds the big block under the pointer from its rect (not the DOM), then the track and quarter within it. If the pointer is over a backlog card instead, the drop target is that card (first-free-slot placement).
 - **Scroll awareness**: geometry conversions account for the grid's `scrollLeft` and `scrollTop`, and the engine recomputes the candidate on scroll as well as on pointer move.
+- **Sticky headers**: month and release strips share a central header-height calculation for body hit-testing and vertical auto-scroll. Releases can be dragged within the header and use whole-month deltas; block and story geometry remains relative to the body.
 - **Backlog ⇄ grid / trash**: the same pointer engine hit-tests backlog cards and the trash zone by their bounding rects, with no handoff to another library.
 - **Keyboard / accessibility**: everything that can be done by dragging is also available from the menus (move to month or row, resize, add item, delete).
 
@@ -306,4 +338,6 @@ The client and server share the domain rules in `shared/domain.js` to keep drop
 validation and persisted-document validation consistent. User-facing row, track,
 and quarter numbers in editing forms count from 1; JSON offsets count from 0.
 Undo restores just the deleted object, preserving subsequent edits. If its old
-location is occupied, it is restored to the backlog instead.
+location is occupied, a block or story is restored to the backlog instead.
+Releases have no backlog location: if their old month is occupied, Undo reports
+the conflict without changing the document.
