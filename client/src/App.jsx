@@ -10,7 +10,7 @@ import JiraLinkPopover from './components/JiraLinkPopover.jsx';
 import ReleaseDialog from './components/ReleaseDialog.jsx';
 
 export default function App() {
-  const { doc, act, status, message, reload, overwrite, undo, error } = useRoadmap();
+  const { doc, act, status, message, reload, undo, error } = useRoadmap();
   const gridRef = useRef(null);
   const colWidthRef = useRef(120);
   const [collapsed, setCollapsed] = useState(false);
@@ -80,9 +80,9 @@ export default function App() {
         <Alert severity="warning" onClose={() => act({ type: 'clearError' })}>{error}</Alert>
       </Snackbar>
       <Dialog open={status === 'conflict'} aria-labelledby="conflict-title">
-        <DialogTitle id="conflict-title">A newer roadmap was saved</DialogTitle>
-        <DialogContent><DialogContentText>Another tab or process changed this roadmap. Reloading discards your unsaved changes. Overwriting replaces the latest document with your local version.</DialogContentText></DialogContent>
-        <DialogActions><Button onClick={reload}>Reload latest</Button><Button color="error" onClick={overwrite}>Overwrite</Button></DialogActions>
+        <DialogTitle id="conflict-title">Someone else just changed the roadmap</DialogTitle>
+        <DialogContent><DialogContentText>Your last change was made at the same moment as theirs and could not be saved. Reload to see their changes, then redo yours.</DialogContentText></DialogContent>
+        <DialogActions><Button variant="contained" onClick={reload}>Reload latest</Button></DialogActions>
       </Dialog>
       {status === 'loadError' && <Alert severity="error" sx={{ position: 'fixed', bottom: 40, left: '25%', right: '25%' }} action={<Button onClick={reload}>Retry reload</Button>}>{message}</Alert>}
       <Typography component="span" className="sr-only" aria-live="polite">{status === 'error' ? message : ''}</Typography>

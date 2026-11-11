@@ -33,6 +33,13 @@ it('serves health, loads, saves and reports revision conflicts and malformed inp
   expect((await fetch(`${url}/api/missing`)).status).toBe(404);
 });
 
+it('reports the current revision cheaply so open pages can notice remote edits', async () => {
+  const doc = await (await fetch(`${url}/api/roadmap`)).json();
+  expect(await (await fetch(`${url}/api/roadmap/revision`)).json()).toEqual({ revision: doc.revision, updatedAt: doc.updatedAt });
+  await fetch(`${url}/api/roadmap`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(doc) });
+  expect((await (await fetch(`${url}/api/roadmap/revision`)).json()).revision).toBe(doc.revision + 1);
+});
+
 it('rejects cross-origin writes, but permits same-origin proxied browser writes', async () => {
   const doc = await (await fetch(`${url}/api/roadmap`)).json();
   const put = (origin) => fetch(`${url}/api/roadmap`, { method: 'PUT', headers: { 'Content-Type': 'application/json', origin }, body: JSON.stringify(doc) });

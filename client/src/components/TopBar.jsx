@@ -25,7 +25,7 @@ export default function TopBar({ onAdd, onAddRelease }) {
           label="Tint release periods" />
         <Button variant="outlined" startIcon={<FlagOutlined />} onClick={onAddRelease} sx={{ ml: 'auto', whiteSpace: 'nowrap' }}>Release</Button>
         <Button variant="contained" startIcon={<Add />} onClick={onAdd} sx={{ whiteSpace: 'nowrap' }}>Big block</Button>
-        <Tooltip title={['error', 'conflict'].includes(status) ? message : 'Changes are saved automatically to this computer'}>
+        <Tooltip title={['error', 'conflict'].includes(status) ? message : 'Changes are saved automatically and shared with everyone using this roadmap'}>
           <Chip
             size="small" aria-live="polite" label={labels[status] || status}
             icon={status === 'saved' ? <CheckCircleOutline /> : ['error', 'conflict'].includes(status) ? <ErrorOutline /> : <Sync />}

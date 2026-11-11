@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { emptyRoadmap } from '@roadmap/shared';
-import { changeDocument } from './reducer.js';
+import { changeDocument, reducer } from './reducer.js';
 
 const apply = (doc, action) => changeDocument(doc, action).doc;
 function setup(scheduled = false) {
@@ -8,6 +8,19 @@ function setup(scheduled = false) {
   if (scheduled) doc = apply(doc, { type: 'updateBig', id: 'a', patch: { placement: { start: '2026-11', row: 0 } } });
   return doc;
 }
+
+describe('adopting a roadmap saved elsewhere', () => {
+  it('replaces the document and keeps the pending undo when nothing changed locally', () => {
+    const state = { doc: setup(), version: 3, undo: { kind: 'big', token: 't' }, error: null };
+    const remote = { ...state.doc, revision: 9 };
+    expect(reducer(state, { type: 'remote', doc: remote, version: 3 })).toEqual({ ...state, doc: remote });
+  });
+
+  it('ignores the remote document if the user edited while it was being fetched', () => {
+    const state = { doc: setup(), version: 4, undo: null, error: null };
+    expect(reducer(state, { type: 'remote', doc: { ...state.doc, revision: 9 }, version: 3 })).toBe(state);
+  });
+});
 
 describe('roadmap actions', () => {
   it('pushes blocks below down when growing downwards, but only when asked to', () => {

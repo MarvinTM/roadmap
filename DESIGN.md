@@ -256,6 +256,7 @@ The API loads and saves the whole document, since it is small.
 |---|---|---|---|
 | `GET` | `/api/roadmap` | none | `200` with the Roadmap. If the file is missing, an empty roadmap is created. |
 | `PUT` | `/api/roadmap` | Roadmap with the `revision` the edit was based on | `200` with `{ revision, updatedAt }`, `409` on a revision mismatch, or `400` if validation fails |
+| `GET` | `/api/roadmap/revision` | none | `200` with `{ revision, updatedAt }`; polled by open pages to notice edits made elsewhere |
 | `GET` | `/api/health` | none | `200` |
 
 Server behavior:
@@ -267,7 +268,9 @@ Server behavior:
 - **Validation**: checks the document shape, month format and numeric ranges. It also enforces the integrity rules: big blocks never share a cell, small blocks are within bounds and don't overlap on a track, and release months and all object IDs are unique.
 - **Production**: `express.static` serves `client/dist`, so there is a single port (default `3001`). In dev, Vite proxies `/api` to it.
 
-**Client persistence**: every action updates the UI immediately, and `useAutosave` PUTs the document about 500 ms after the last change (debounced). Previews during a drag are local and only saved on drop. On a save error, the indicator turns red and offers a retry. On `409`, a dialog offers "Reload latest" or "Overwrite".
+**Client persistence**: every action updates the UI immediately, and `useAutosave` PUTs the document about 500 ms after the last change (debounced). Previews during a drag are local and only saved on drop. On a save error, the indicator turns red and offers a retry. On `409`, a dialog explains that someone else saved at the same moment and offers only "Reload latest" (there is deliberately no overwrite: it would discard the other person's work).
+
+**Staying in sync**: several people (or tabs) can have the roadmap open. Every second, a visible page asks `GET /api/roadmap/revision`; when the revision differs and the page has no unsaved changes, no save in flight and no drag in progress, it fetches the document and adopts it in place (a pending Undo survives). The check pauses while the tab is hidden and runs immediately when it becomes visible again. A `409` therefore only happens when two people edit within the same second or so.
 
 ## 8. Drag & resize engine notes
 

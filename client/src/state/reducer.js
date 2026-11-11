@@ -134,6 +134,9 @@ export function changeDocument(doc, action) {
 export function reducer(state, action) {
   if (action.type === 'load') return { doc: action.doc, version: 0, undo: null, error: null };
   if (action.type === 'saved') return { ...state, doc: { ...state.doc, ...action.metadata } };
+  // Someone else saved: adopt their document, but only if nothing changed locally
+  // since the fetch started. Keeps the pending Undo, which works on any document.
+  if (action.type === 'remote') return state.version === action.version ? { ...state, doc: action.doc } : state;
   if (action.type === 'clearError') return { ...state, error: null };
   if (action.type === 'clearUndo') return { ...state, undo: null };
   try {

@@ -23,6 +23,11 @@ export function createApp(storage, clientDir) {
   app.get('/api/health', (_req, res) => res.json({ ok: true }));
   app.get('/api/roadmap', async (_req, res) => res.json(await storage.read()));
   app.put('/api/roadmap', async (req, res) => res.json(await storage.write(req.body)));
+  // Cheap check that open pages poll to notice edits made by someone else.
+  app.get('/api/roadmap/revision', async (_req, res) => {
+    const { revision, updatedAt } = await storage.read();
+    res.json({ revision, updatedAt });
+  });
   app.use('/api', (_req, res) => res.status(404).json({ error: 'API route not found.' }));
   if (clientDir && existsSync(resolve(clientDir, 'index.html'))) {
     app.use(express.static(clientDir));

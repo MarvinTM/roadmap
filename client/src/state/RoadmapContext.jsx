@@ -3,6 +3,8 @@ import { validateRoadmap } from '@roadmap/shared';
 import { reducer } from './reducer.js';
 
 const RoadmapContext = createContext(null);
+// How often an open page checks whether someone else saved a newer roadmap.
+export const SYNC_INTERVAL_MS = 1000;
 export const useRoadmap = () => useContext(RoadmapContext);
 
 async function request(method, doc) {
@@ -54,15 +56,14 @@ export function RoadmapProvider({ children }) {
     return () => { alive.current = false; };
   }, [load]);
 
-  const save = useCallback(async (overwrite = false) => {
-    if (busy.current || !current.current.doc || (!overwrite && current.current.version === savedVersion.current)) return;
+  const save = useCallback(async () => {
+    if (busy.current || !current.current.doc || current.current.version === savedVersion.current) return;
     busy.current = true;
     setStatus('saving');
     try {
-      // Rebase the local snapshot onto the latest revision, still using CAS on PUT.
-      const revision = overwrite ? (await request('GET')).revision : current.current.doc.revision;
+      // The server only accepts the save if `revision` is still the latest (compare-and-swap).
       const snapshot = current.current;
-      const metadata = await request('PUT', { ...snapshot.doc, revision });
+      const metadata = await request('PUT', snapshot.doc);
       if (!alive.current) return;
       savedVersion.current = snapshot.version;
       dispatch({ type: 'saved', metadata });
@@ -78,6 +79,41 @@ export function RoadmapProvider({ children }) {
     return () => clearTimeout(timer);
   }, [state.doc, state.version, status, retry, save]);
 
+  // Keep the page up to date with edits made elsewhere (another person or tab).
+  // Only adopts the newer document while there is nothing unsaved locally and no
+  // drag in progress, so it never discards or disturbs the user's own work.
+  const statusRef = useRef(status);
+  statusRef.current = status;
+  useEffect(() => {
+    let checking = false;
+    const idle = () => !busy.current && statusRef.current === 'saved' && current.current.doc &&
+      current.current.version === savedVersion.current && !document.body.classList.contains('dragging');
+    const check = async () => {
+      if (checking || document.hidden || !idle()) return;
+      checking = true;
+      try {
+        const response = await fetch('api/roadmap/revision', { cache: 'no-store' });
+        if (!response.ok) return;
+        const { revision } = await response.json();
+        if (!alive.current || revision === current.current.doc.revision || !idle()) return;
+        const version = current.current.version;
+        const doc = await request('GET');
+        if (!alive.current || validateRoadmap(doc) || !idle()) return;
+        dispatch({ type: 'remote', doc, version });
+      } catch { /* Offline or logged out: the next check, or the next save, will tell. */ }
+      finally { checking = false; }
+    };
+    const timer = setInterval(check, SYNC_INTERVAL_MS);
+    const visible = () => { if (!document.hidden) check(); };
+    document.addEventListener('visibilitychange', visible);
+    window.addEventListener('focus', visible);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', visible);
+      window.removeEventListener('focus', visible);
+    };
+  }, []);
+
   useEffect(() => {
     const warn = (event) => {
       if (current.current.doc && current.current.version !== savedVersion.current) { event.preventDefault(); event.returnValue = ''; }
@@ -91,7 +127,7 @@ export function RoadmapProvider({ children }) {
   return (
     <RoadmapContext.Provider value={{
       ...state, act, status: state.doc && status === 'saved' && state.version !== savedVersion.current ? 'pending' : status,
-      message, reload: load, retrySave, overwrite: () => save(true),
+      message, reload: load, retrySave,
     }}>
       {children}
     </RoadmapContext.Provider>

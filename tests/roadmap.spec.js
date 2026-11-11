@@ -437,21 +437,20 @@ test('prevents adding to full scheduled blocks and retains the original contents
   expect((await persisted(request)).bigBlocks[0].smallBlocks).toHaveLength(1);
 });
 
-test('handles conflict overwrite using the latest revision, then persists new edits', async ({ page, request }) => {
+test('shows changes saved by someone else within seconds, without reloading', async ({ page, request }) => {
   await seed(request, [big()]);
   await page.goto('/');
   await saved(page);
   const remote = await persisted(request);
-  await request.put(api, { data: { ...remote, settings: { ...remote.settings, monthsVisible: 4 } } });
+  await request.put(api, { data: { ...remote, bigBlocks: [...remote.bigBlocks, big({ id: 'b2', title: 'Added elsewhere', months: 1, rows: 1, placement: { start: '2027-01', row: 3 } })] } });
+  await expect(page.getByText('Added elsewhere')).toBeVisible({ timeout: 5000 });
+  // The page is now on the latest revision, so the next local edit saves cleanly.
   await page.getByRole('button', { name: 'Next month', exact: true }).click();
-  await expect(page.getByRole('dialog')).toBeVisible();
-  await page.getByRole('button', { name: 'Overwrite', exact: true }).click();
+  await saved(page);
+  const latest = await persisted(request);
+  expect(latest.settings.startMonth).toBe('2026-12');
+  expect(latest.bigBlocks.map((b) => b.id)).toEqual(['b1', 'b2']);
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  await saved(page);
-  expect((await persisted(request)).settings).toEqual({ startMonth: '2026-12', monthsVisible: 6, tintReleasePeriods: false });
-  await page.getByRole('button', { name: 'Next month', exact: true }).click();
-  await saved(page);
-  expect((await persisted(request)).settings.startMonth).toBe('2027-01');
 });
 
 test('preserves edits made while an earlier save is in flight', async ({ page, request }) => {
@@ -567,12 +566,15 @@ test('auto-scrolls vertically and grows the grid while dragging below the last r
 });
 
 test('conflict reload discards local changes and restores the server document', async ({ page, request }) => {
+  // Hold back the sync check so the local edit races the remote one, as when both happen in the same second.
+  await page.route('**/api/roadmap/revision', (route) => route.abort());
   await page.goto('/');
   await saved(page);
   const remote = await persisted(request);
   await request.put(api, { data: { ...remote, settings: { ...remote.settings, monthsVisible: 4 } } });
   await page.getByRole('button', { name: 'Next month', exact: true }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Overwrite' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Reload latest', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await saved(page);
