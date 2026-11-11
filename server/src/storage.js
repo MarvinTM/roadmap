@@ -8,6 +8,12 @@ export class StorageError extends Error {
 }
 
 export function createStorage(file) {
+  async function lockIsStale() {
+    const pid = Number((await readFile(`${file}.lock`, 'utf8').catch(() => '')).trim());
+    if (!Number.isInteger(pid) || pid <= 0) return false; // unknown owner: be safe
+    try { process.kill(pid, 0); return false; } // process exists
+    catch (error) { return error.code === 'ESRCH'; }
+  }
   let queue = Promise.resolve();
   const serialize = (operation) => {
     const result = queue.then(operation);
@@ -69,8 +75,12 @@ export function createStorage(file) {
       let handle;
       try { handle = await open(`${file}.lock`, 'wx', 0o600); }
       catch (error) {
-        if (error.code === 'EEXIST') throw new Error(`Storage is locked: ${file}.lock. Stop the other server, or remove this lock if its process is no longer running.`);
-        throw error;
+        if (error.code !== 'EEXIST') throw error;
+        // A lock left by a process that no longer exists (crash, reboot, SIGKILL)
+        // would otherwise keep the server from ever starting again.
+        if (!(await lockIsStale())) throw new Error(`Storage is locked: ${file}.lock. Stop the other server, or remove this lock if its process is no longer running.`);
+        await unlink(`${file}.lock`);
+        handle = await open(`${file}.lock`, 'wx', 0o600);
       }
       await writeFile(handle, String(process.pid));
       return async () => {

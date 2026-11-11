@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mkdtemp, readFile, writeFile, rm, symlink, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -47,6 +48,16 @@ describe('JSON persistence', () => {
     await unlock();
     const release = await createStorage(file).lock();
     await release();
+  });
+  it('reclaims a lock left by a process that no longer exists, but not an unreadable one', async () => {
+    const deadPid = spawnSync(process.execPath, ['-e', '']).pid;
+    await writeFile(`${file}.lock`, String(deadPid));
+    const release = await createStorage(file).lock();
+    expect(await readFile(`${file}.lock`, 'utf8')).toBe(String(process.pid));
+    await release();
+    await writeFile(`${file}.lock`, 'not a pid');
+    await expect(createStorage(file).lock()).rejects.toThrow('Storage is locked');
+    await unlink(`${file}.lock`);
   });
   it('migrates schema v1 once, preserving all blocks and a permanent byte-for-byte pre-upgrade backup', async () => {
     const legacy = {

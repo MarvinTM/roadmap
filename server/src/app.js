@@ -5,6 +5,9 @@ import { resolve } from 'node:path';
 export function createApp(storage, clientDir) {
   const app = express();
   app.disable('x-powered-by');
+  // Behind a local reverse proxy (nginx), take the protocol from X-Forwarded-Proto
+  // so the same-origin write check below sees https, not http.
+  app.set('trust proxy', 'loopback');
   app.use('/api', (req, res, next) => {
     res.set('Cache-Control', 'no-store');
     // This is a local, unauthenticated app: reject cross-origin browser writes.

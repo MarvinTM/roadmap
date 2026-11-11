@@ -1,3 +1,4 @@
+import { request as httpRequest } from 'node:http';
 import { beforeEach, afterEach, expect, it } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -37,6 +38,22 @@ it('rejects cross-origin writes, but permits same-origin proxied browser writes'
   const put = (origin) => fetch(`${url}/api/roadmap`, { method: 'PUT', headers: { 'Content-Type': 'application/json', origin }, body: JSON.stringify(doc) });
   expect((await put('https://unrelated.example')).status).toBe(403);
   expect((await put(url)).status).toBe(200);
+});
+
+it('accepts same-origin writes arriving over https through a local reverse proxy', async () => {
+  const doc = await (await fetch(`${url}/api/roadmap`)).json();
+  const { port } = new URL(url);
+  // Mimics nginx: browser talks https to villacautela.com, nginx forwards http to us.
+  const put = (proto) => new Promise((resolveStatus, reject) => {
+    const req = httpRequest({
+      host: '127.0.0.1', port, path: '/api/roadmap', method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Host: 'villacautela.com', Origin: 'https://villacautela.com', 'X-Forwarded-Proto': proto },
+    }, (res) => { res.resume(); resolveStatus(res.statusCode); });
+    req.on('error', reject);
+    req.end(JSON.stringify(doc));
+  });
+  expect(await put('http')).toBe(403);
+  expect(await put('https')).toBe(200);
 });
 
 it('persists releases and rejects duplicate boundaries and old-client saves without losing data', async () => {

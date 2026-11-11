@@ -6,7 +6,8 @@ const RoadmapContext = createContext(null);
 export const useRoadmap = () => useContext(RoadmapContext);
 
 async function request(method, doc) {
-  const response = await fetch('/api/roadmap', {
+  // Relative on purpose: resolves under whatever path the app is served from.
+  const response = await fetch('api/roadmap', {
     method, cache: 'no-store',
     ...(doc ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(doc) } : {}),
   });
