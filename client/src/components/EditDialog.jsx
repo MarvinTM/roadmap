@@ -11,7 +11,7 @@ export default function EditDialog({ selection, onClose }) {
   const item = selection.type === 'small' ? parent?.smallBlocks.find((s) => s.id === selection.id) : null;
   const [form, setForm] = useState(() => item ? {
     title: item.title, jiraUrl: item.jiraUrl || '', targetId: parent.id, track: item.track + 1,
-    offset: item.offset + 1, length: item.length,
+    offset: item.offset + 1, length: item.length, done: Boolean(item.done),
   } : {
     title: parent.title, color: parent.color, scheduled: Boolean(parent.placement),
     start: parent.placement?.start || doc.settings.startMonth || currentMonth(), row: (parent.placement?.row || 0) + 1,
@@ -28,7 +28,7 @@ export default function EditDialog({ selection, onClose }) {
       action = {
         type: 'updateSmall', parentId: parent.id, id: item.id, targetId: target.id,
         autoSlot: !target.placement && target.id !== parent.id,
-        patch: { title: form.title.trim(), jiraUrl: form.jiraUrl.trim() || null, track: Number(form.track) - 1, offset: Number(form.offset) - 1, length: Number(form.length) },
+        patch: { title: form.title.trim(), jiraUrl: form.jiraUrl.trim() || null, track: Number(form.track) - 1, offset: Number(form.offset) - 1, length: Number(form.length), done: form.done },
       };
     } else {
       // Start changes in this dialog move the whole block; edge drags alone anchor items.
@@ -59,6 +59,7 @@ export default function EditDialog({ selection, onClose }) {
             {automatic ? <Typography variant="body2" color="text.secondary">The item will use the first free slot. The backlog block will grow if needed.</Typography> :
               <Stack direction="row" spacing={1}>{numberField('track', 'Track')}{numberField('offset', 'Start quarter')}</Stack>}
             {numberField('length', 'Length in quarters')}
+            <FormControlLabel control={<Checkbox checked={form.done} onChange={change('done')} />} label="Done" />
             <Typography variant="caption" color="text.secondary">Track and start quarter count from 1. Four quarters equal one month.</Typography>
           </> : <>
             <div className="palette" role="group" aria-label="Block color">

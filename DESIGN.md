@@ -22,7 +22,7 @@ A lightweight, single-user web app for managing a personal roadmap. You create *
 | **Grid** | The main area: **month columns** × **rows**. Each (month, row) pair is a **cell**. |
 | **Big block** | A titled, colored rectangle on the grid that covers `N months × M rows`. Big blocks never share a cell. A block may start in the month right after another block in the same row ends. A big block can also be *unscheduled*, which means it sits in the backlog and keeps its shape and contents. |
 | **Track** | A horizontal lane *inside* a big block. A big block has one track per grid row it covers, so a 3-row block has 3 parallel tracks. |
-| **Small block** | A bar inside a big block. It sits on one track and covers a range of **quarter-months** (minimum 1 quarter, i.e. ¼ of a month column). It has a title and an optional Jira link. |
+| **Small block** | A bar inside a big block. It sits on one track and covers a range of **quarter-months** (minimum 1 quarter, i.e. ¼ of a month column). It has a title, an optional Jira link and a **done** flag. |
 | **Quarter (q)** | The unit for positioning small blocks: ¼ of a month column. It is a visual subdivision and is not tied to calendar days. |
 | **Backlog** | A side panel of unscheduled big blocks. |
 | **Release** | A named, colored boundary at the end of a month. It marks the end of a calendar period, independently of blocks or stories. |
@@ -110,6 +110,7 @@ A lightweight, single-user web app for managing a personal roadmap. You create *
 | Move out of a backlog block | Drag an item from an expanded backlog card onto a big block on the grid or another backlog card | It is placed as above. |
 | Resize | Drag the left or right edge | It snaps to quarters. The minimum is **1 q** and the maximum is the big block's width. |
 | Rename | Double-click the title | Inline edit |
+| Mark item done | Chip menu → "Mark as done" / "Mark as not done", or the "Done" checkbox in "Move, resize & edit" | Done items show a green check, a struck-through title and a muted chip. The flag is stored as `"done": true` and is optional (missing means not done). |
 | Set Jira link | Click the Jira icon, or use the chip's context menu → "Edit link" | A small popover with a URL field. Clicking the icon when a link is set opens it in a new tab. |
 | Delete | Drag it to the trash, or use the context menu → Delete | It is removed, with an Undo snackbar. |
 
@@ -224,6 +225,7 @@ aiRoadmap/
           "id": "s9a…",
           "title": "API design",
           "jiraUrl": "https://acme.atlassian.net/browse/PLAT-12",  // or null
+          "done": true,              // optional; missing means not done
           "track": 0,                // 0 … rows − 1
           "offset": 0,               // quarters from the big block's start (≥ 0)
           "length": 4                // quarters (≥ 1); offset + length ≤ months × 4

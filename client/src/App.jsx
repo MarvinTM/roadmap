@@ -38,6 +38,7 @@ export default function App() {
     {status === 'loadError' ? <Alert severity="error" action={<Button onClick={reload}>Retry</Button>}>{message}</Alert> : <CircularProgress aria-label="Loading roadmap" />}
   </Box>;
   const menuParent = menu && doc.bigBlocks.find((b) => b.id === (menu.parentId || menu.id));
+  const menuItem = menu?.type === 'small' ? menuParent?.smallBlocks.find((s) => s.id === menu.id) : null;
   const runMenu = (fn) => { pendingMenuAction.current = fn; setMenu(null); };
   return (
     <div className="app">
@@ -65,6 +66,7 @@ export default function App() {
           menuParent?.placement && <MenuItem key="left" onClick={() => runMenu(() => setDialog({ type: 'left', id: menu.id }))}>Resize from left</MenuItem>,
           menuParent?.placement && <MenuItem key="unschedule" onClick={() => runMenu(() => act({ type: 'updateBig', id: menu.id, patch: { placement: null } }))}>Unschedule</MenuItem>,
         ]}
+        {menu?.type === 'small' && menuItem && <MenuItem onClick={() => runMenu(() => act({ type: 'updateSmall', parentId: menu.parentId, id: menu.id, patch: { done: !menuItem.done } }))}>{menuItem.done ? 'Mark as not done' : 'Mark as done'}</MenuItem>}
         {menu?.type === 'small' && <MenuItem onClick={() => runMenu(() => setDialog({ ...menu, type: 'link' }))}>Edit link</MenuItem>}
         <Divider />
         <MenuItem sx={{ color: 'error.main' }} onClick={() => runMenu(() => act(menu.type === 'release' ? { type: 'deleteRelease', id: menu.id } : menu.type === 'big' ? { type: 'deleteBig', id: menu.id } : { type: 'deleteSmall', parentId: menu.parentId, id: menu.id }))}>Delete</MenuItem>

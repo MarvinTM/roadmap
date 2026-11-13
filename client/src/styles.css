@@ -51,6 +51,9 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .tracks { position: absolute; left: 0; right: 0; bottom: 0; background-image: linear-gradient(to right, #2330440d 1px, transparent 1px), linear-gradient(to bottom, #23304418 1px, transparent 1px); }
 .item-position { position: absolute; container-type: inline-size; }
 .small-block { position: relative; display: flex; align-items: center; gap: 1px; border: 1px solid #d5dce6; border-left: 3px solid; border-radius: 5px; background: white; height: 100%; width: 100%; padding: 1px 4px 1px 1px; font-size: 11px; color: #24364b; cursor: grab; touch-action: none; box-shadow: 0 1px 2px #1f324310; }
+.small-block.done { background: #f3f5f8; color: #7a8696; border-color: #e1e6ed; }
+.small-block.done .inline-title { text-decoration: line-through; }
+.small-block .done-mark { flex-shrink: 0; color: #2e7d32; }
 .small-block:hover { box-shadow: 0 2px 6px #1f324326; }
 .item-grip { flex-shrink: 0; color: #98a5b6; }
 .small-block .inline-title { line-height: 20px; }

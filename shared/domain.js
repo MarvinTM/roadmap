@@ -1,4 +1,4 @@
-/** @typedef {{id:string,title:string,jiraUrl:string|null,track:number,offset:number,length:number}} SmallBlock */
+/** @typedef {{id:string,title:string,jiraUrl:string|null,done?:boolean,track:number,offset:number,length:number}} SmallBlock */
 /** @typedef {{id:string,title:string,color:string,months:number,rows:number,placement:{start:string,row:number}|null,backlogOrder:number|null,smallBlocks:SmallBlock[]}} BigBlock */
 /** @typedef {{id:string,title:string,month:string,color:string}} Release */
 /** @typedef {{schemaVersion:2,revision:number,updatedAt:string,settings:{startMonth:string,monthsVisible:number,tintReleasePeriods:boolean},bigBlocks:BigBlock[],releases:Release[]}} Roadmap */
@@ -230,7 +230,7 @@ export function validateRoadmap(doc, { allowLegacy = false } = {}) {
     if (block.placement ? block.backlogOrder !== null : !integer(block.backlogOrder)) return 'Invalid backlog order.';
     for (const item of block.smallBlocks) {
       if (!item || !checkId(item.id) || typeof item.title !== 'string' || !item.title.trim() ||
-          !validUrl(item.jiraUrl) || !integer(item.track) || !integer(item.offset) || !integer(item.length, 1)) return 'Invalid small block.';
+          !validUrl(item.jiraUrl) || (item.done !== undefined && typeof item.done !== 'boolean') || !integer(item.track) || !integer(item.offset) || !integer(item.length, 1)) return 'Invalid small block.';
     }
   }
   for (const block of doc.bigBlocks) {

@@ -428,6 +428,28 @@ test('offers menu-based schedule, resize, color and link editing without draggin
   expect((await persisted(request)).bigBlocks[0]).toMatchObject({ color: '#00897b', placement: { start: '2026-12', row: 2 }, smallBlocks: [{ jiraUrl: 'https://example.atlassian.net/browse/PLAT-12' }] });
 });
 
+test('marks an item done and not done again from its menu and the edit dialog', async ({ page, request }) => {
+  await seed(request, [big({ smallBlocks: [item()] })]);
+  await page.goto('/');
+  const chip = page.locator('[data-small-id="s1"]');
+  await page.getByRole('button', { name: 'Item menu: API design' }).click();
+  await page.getByRole('menuitem', { name: 'Mark as done' }).click();
+  await expect(chip).toHaveClass(/\bdone\b/);
+  await expect(page.getByRole('img', { name: 'Done: API design' })).toBeVisible();
+  await saved(page);
+  expect((await persisted(request)).bigBlocks[0].smallBlocks[0]).toMatchObject({ done: true });
+  await page.getByRole('button', { name: 'Item menu: API design' }).click();
+  await page.getByRole('menuitem', { name: 'Move, resize & edit' }).click();
+  await expect(page.getByRole('checkbox', { name: 'Done' })).toBeChecked();
+  await page.getByRole('checkbox', { name: 'Done' }).uncheck();
+  await page.getByRole('button', { name: 'Apply', exact: true }).click();
+  await expect(chip).not.toHaveClass(/\bdone\b/);
+  await saved(page);
+  expect((await persisted(request)).bigBlocks[0].smallBlocks[0]).toMatchObject({ done: false });
+  await page.getByRole('button', { name: 'Item menu: API design' }).click();
+  await expect(page.getByRole('menuitem', { name: 'Mark as done' })).toBeVisible();
+});
+
 test('prevents adding to full scheduled blocks and retains the original contents', async ({ page, request }) => {
   await seed(request, [big({ months: 1, rows: 1, smallBlocks: [item()] })]);
   await page.goto('/');

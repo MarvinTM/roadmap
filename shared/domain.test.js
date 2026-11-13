@@ -210,6 +210,7 @@ describe('document integrity', () => {
     ['overflowing month', () => doc(block({ placement: { start: '9999-12', row: 0 } }))],
     ['missing small blocks', () => doc(block({ smallBlocks: null }))],
     ['overlap', () => doc(block(), block({ id: 'b2' }))],
+    ['non-boolean done flag', () => doc(block({ smallBlocks: [item({ done: 'yes' })] }))],
     ['out-of-bounds item', () => doc(block({ smallBlocks: [item({ track: 5 })] }))],
   ])('rejects %s', (_label, factory) => expect(validateRoadmap(factory())).not.toBe(null));
 });
